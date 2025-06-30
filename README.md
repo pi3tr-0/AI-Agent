@@ -1,3 +1,13 @@
+How to Run:
+1. Create a virtual environment
+2. Open terminal, navigate to the folder, pip install openai and dotenv
+3. In the terminal, type in: export OPENAI_API_KEY="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"
+4. Then, in terminal: python model.py
+
+Things to do, 30/6:
+1. Architecture Diagram
+2. Key/Common terminologies 
+
 # AI-Agent
 AI Agent, project by Adam and Danny
 
@@ -32,3 +42,4 @@ AI Agent, project by Adam and Danny
 7. Deployment
 
 8. Documentation
+
