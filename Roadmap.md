@@ -1,8 +1,10 @@
 # AI Agent Roadmap
-
+[Figma Link](https://www.figma.com/board/cicoU002Rqsgz9tCknewgn/Welcome-to-FigJam?node-id=0-1&t=1d9werCLVVBJdkXF-1)
 ---
 
 ## Phase 1 – Core Intelligence Layer
+
+![Phase 1 Structure](./image/phase%20structure/Phase%201.png)
 
 ### 1. Financial Report Summarizer
 - **Purpose:** Automatically generate concise summaries of quarterly earnings call transcripts or 10-K/10-Q filings.
