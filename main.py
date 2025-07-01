@@ -1,5 +1,7 @@
 import streamlit as st
 from pypdf import PdfReader
+from src import fileParser
+import io
 
 col1, col2 = st.columns(2)
 
@@ -13,6 +15,4 @@ with col2:
     )
 
 if st.button("Submit", type="primary"):
-    reader = PdfReader(uploaded_file)
-    page = reader.pages[0]
-    st.write(page.extract_text())
+    st.write(fileParser.parseFile(uploaded_file))
