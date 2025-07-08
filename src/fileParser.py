@@ -27,7 +27,7 @@ def ParseFile(pdf, api_key):
         profitMargins: float
         sharesOutstanding: int
         trailingEps: float
-        dividenRate: float
+        dividendRate: float
         priceToSales: float
         trailingPE: float
         priceCashFlow: float
