@@ -3,3 +3,5 @@ pandas
 yfinance
 python-dotenv
 openai
+pypdf
+pydantic_ai

@@ -1,10 +1,19 @@
 import yfinance as yf
 import sqlite3
 import pandas as pd
+import os
 
+BASE_DIR = os.path.dirname("/Users/admin/Desktop/AI-Agent/src")                        # e.g. .../AI-Agent
+DB_DIR   = os.path.join(BASE_DIR, "util", "database")       # .../AI-Agent/util/database
+os.makedirs(DB_DIR, exist_ok=True)
+
+DB_PATH = os.path.join(DB_DIR, "finance_relational.db")     # full path
+
+# 1) Your tickers
 tickers = ["META", "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "NFLX", "ADBE", "INTC"]
 
-important_metrics = [
+# 2) Base Income-statement metrics (as they appear in yf.Ticker().financials)
+base_metrics = [
     "Total Revenue",
     "Net Income",
     "Diluted EPS",
@@ -22,11 +31,37 @@ important_metrics = [
     "Normalized Income"
 ]
 
-# Connect to database
-conn = sqlite3.connect("finance_relational.db")
-cursor = conn.cursor()
+# 3) All the derived/calculable metrics you asked for
+derived_metrics = [
+    "Revenue Growth",
+    "Operating Margin",
+    "EBITDA Margin",
+    "Net Margin",
+    "Shares Outstanding",
+    "Trailing EPS",
+    "Forward EPS",
+    "Dividends Per Share",
+    "Dividend Yield",
+    "Price/Sales Ratio",
+    "Price/Earnings Ratio",
+    "Price/Cash Flow Ratio",
+    "Price/Book Ratio",
+    "EV/EBITDA",
+    "ROA",
+    "ROE",
+    "ROIC",
+    "Asset Turnover",
+    "Debt/Capital Ratio",
+    "Equity/Assets Ratio",
+    "Total Debt/EBITDA",
+    "EBITDA/Interest Expense"
+]
 
-# Drop existing tables
+all_metrics = base_metrics + derived_metrics
+
+# 4) Set up your database
+conn = sqlite3.connect(DB_PATH)
+cursor = conn.cursor()
 cursor.executescript("""
 DROP TABLE IF EXISTS financials;
 DROP TABLE IF EXISTS metrics;
@@ -53,42 +88,102 @@ CREATE TABLE financials (
 );
 """)
 
-# Preload metrics table
-for metric in important_metrics:
-    cursor.execute("INSERT INTO metrics (name) VALUES (?)", (metric,))
-
+# 5) Preload metrics table
+for m in all_metrics:
+    cursor.execute("INSERT INTO metrics (name) VALUES (?)", (m,))
 conn.commit()
 
-# Map metric names to IDs
-metric_map = {row[1]: row[0] for row in cursor.execute("SELECT * FROM metrics").fetchall()}
+metric_map = {name: mid for mid, name in cursor.execute("SELECT id,name FROM metrics")}
 
-# Loop through tickers
-for ticker_symbol in tickers:
+# 6) Loop through tickers
+for symbol in tickers:
     try:
-        ticker = yf.Ticker(ticker_symbol)
-        df = ticker.financials
-        df = df.loc[df.index.intersection(important_metrics)]
-        df = df.reset_index().melt(id_vars="index", var_name="Date", value_name="Value")
-        df.columns = ["Metric", "Date", "Value"]
-        df["Year"] = pd.to_datetime(df["Date"]).dt.year
+        tk = yf.Ticker(symbol)
 
-        # Insert company
-        cursor.execute("INSERT OR IGNORE INTO companies (ticker) VALUES (?)", (ticker_symbol,))
-        conn.commit()
-        cursor.execute("SELECT id FROM companies WHERE ticker = ?", (ticker_symbol,))
-        company_id = cursor.fetchone()[0]
+        # --- A) Pull the raw financials and reshape ---
+        fin = tk.financials.loc[base_metrics].reset_index().melt(
+            id_vars="index", var_name="Date", value_name="Value"
+        ).rename(columns={"index":"Metric"})
+        fin["Year"] = pd.to_datetime(fin["Date"]).dt.year
 
-        # Insert financials
-        for _, row in df.iterrows():
-            metric_id = metric_map.get(row["Metric"])
-            if metric_id and not pd.isna(row["Value"]):
-                cursor.execute("""
-                    INSERT INTO financials (company_id, metric_id, year, value)
-                    VALUES (?, ?, ?, ?)
-                """, (company_id, metric_id, int(row["Year"]), float(row["Value"])))
+        # --- B) Compute Revenue Growth (YoY) ---
+        rev = fin[fin.Metric=="Total Revenue"].sort_values("Year")
+        rev = rev[["Year","Value"]].dropna().reset_index(drop=True)
+        growth_rows = []
+        for i in range(1, len(rev)):
+            y, v, prev_v = rev.loc[i, "Year"], rev.loc[i, "Value"], rev.loc[i-1, "Value"]
+            growth_rows.append({
+                "Metric": "Revenue Growth",
+                "Date": f"{y}-01-01",
+                "Value": (v/prev_v - 1),
+                "Year": y
+            })
+        rev_growth_df = pd.DataFrame(growth_rows)
+
+        # --- C) Pull .info and compute every other metric ---
+        info = tk.info
+        # handy locals
+        price   = info.get("currentPrice")
+        rev_tot = info.get("totalRevenue")
+        ni      = info.get("netIncomeToCommon")
+        op_inc  = info.get("operatingIncome")
+        ebitda  = info.get("ebitda")
+        debt    = info.get("totalDebt")
+        eqty    = info.get("totalStockholderEquity")
+        assets  = info.get("totalAssets")
+        interest = info.get("interestExpense")
+
+        extra = {
+            "Operating Margin":      info.get("operatingMargins"),
+            "EBITDA Margin":         info.get("ebitdaMargins"),
+            "Net Margin":            info.get("profitMargins"),
+            "ROA":                   info.get("returnOnAssets"),
+            "ROE":                   info.get("returnOnEquity"),
+            "ROIC":                  info.get("returnOnInvestment"),
+            "Asset Turnover":        (rev_tot / assets) if rev_tot and assets else None,
+            "Debt/Capital Ratio":    (debt / (debt+eqty)) if debt and eqty else None,
+            "Equity/Assets Ratio":   (eqty / assets) if eqty and assets else None,
+            "Total Debt/EBITDA":     (debt / ebitda) if debt and ebitda else None,
+            "EBITDA/Interest Expense": (ebitda/interest) if ebitda and interest else None,
+            "Shares Outstanding":    info.get("sharesOutstanding"),
+            "Trailing EPS":          info.get("trailingEps"),
+            "Forward EPS":           info.get("forwardEps"),
+            "Dividends Per Share":   info.get("dividendRate"),
+            "Dividend Yield":        info.get("dividendYield"),
+            "Price/Sales Ratio":     info.get("priceToSalesTrailing12Months"),
+            "Price/Earnings Ratio":  info.get("trailingPE"),
+            "Price/Cash Flow Ratio": info.get("priceToFreeCashflow"),
+            "Price/Book Ratio":      info.get("priceToBook"),
+            "EV/EBITDA":             (info.get("enterpriseValue")/ebitda) if info.get("enterpriseValue") and ebitda else None,
+        }
+
+        # build extra‐metrics DataFrame for current year
+        this_year = pd.Timestamp.now().year
+        extra_rows = [
+            {"Metric": m, "Date": f"{this_year}-01-01", "Value": v, "Year": this_year}
+            for m, v in extra.items() if v is not None
+        ]
+        extra_df = pd.DataFrame(extra_rows)
+
+        # --- D) Combine everything ---
+        full = pd.concat([fin, rev_growth_df, extra_df], ignore_index=True)
+
+        # --- E) Insert into DB ---
+        cursor.execute("INSERT OR IGNORE INTO companies (ticker) VALUES (?)", (symbol,))
         conn.commit()
-        print(f"Saved {ticker_symbol}")
+        cid = cursor.execute("SELECT id FROM companies WHERE ticker=?", (symbol,)).fetchone()[0]
+
+        for _, row in full.iterrows():
+            mid = metric_map.get(row["Metric"])
+            if mid and pd.notna(row["Value"]):
+                cursor.execute(
+                    "INSERT INTO financials (company_id, metric_id, year, value) VALUES (?,?,?,?)",
+                    (cid, mid, int(row["Year"]), float(row["Value"]))
+                )
+        conn.commit()
+        print(f"✅ Saved {symbol}")
+
     except Exception as e:
-        print(f"Failed to process {ticker_symbol}: {e}")
+        print(f"⚠️ Failed {symbol}: {e}")
 
 conn.close()
