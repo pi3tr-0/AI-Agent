@@ -4,10 +4,10 @@ import pandas as pd
 import os
 
 # Define paths
-BASE_DIR = os.path.dirname("/Users/admin/Desktop/AI-Agent/src")                   
-DB_DIR   = os.path.join(BASE_DIR, "util", "database")                             
+BASE_DIR = os.path.dirname("/Users/admin/Desktop/AI-Agent/src")                        # e.g. .../AI-Agent
+DB_DIR   = os.path.join(BASE_DIR, "util", "database")                               # .../AI-Agent/util/database
 os.makedirs(DB_DIR, exist_ok=True)
-DB_PATH = os.path.join(DB_DIR, "finance_relational.db")                           
+DB_PATH = os.path.join(DB_DIR, "finance_relational.db")                               # full path
 
 # 1) Tickers to process
 tickers = ["META", "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "NFLX", "ADBE", "INTC"]
@@ -30,7 +30,7 @@ base_metrics = [
     "Normalized Income"
 ]
 
-# 3) Derived/calculated metrics (with specified removals applied)
+# 3) Derived/calculated metrics
 derived_metrics = [
     "Revenue Growth",
     "Operating Margin",
@@ -55,7 +55,7 @@ derived_metrics = [
 
 all_metrics = base_metrics + derived_metrics
 
-# 4) Initialize SQLite database
+# Initialize database and tables
 conn = sqlite3.connect(DB_PATH)
 cursor = conn.cursor()
 cursor.executescript("""
@@ -84,28 +84,40 @@ CREATE TABLE financials (
 );
 """)
 
-# 5) Seed metrics table
+# Seed metrics table
 for m in all_metrics:
     cursor.execute("INSERT INTO metrics (name) VALUES (?)", (m,))
 conn.commit()
 metric_map = {name: mid for mid, name in cursor.execute("SELECT id, name FROM metrics")}
 
-# 6) Fetch and insert data for each ticker
+# Loop through tickers and ingest data
 for symbol in tickers:
-    try:
-        tk = yf.Ticker(symbol)
+    print(f"⏳ Processing {symbol}...")
+    # Ensure company record exists
+    cursor.execute("INSERT OR IGNORE INTO companies (ticker) VALUES (?)", (symbol,))
+    conn.commit()
+    company_id = cursor.execute("SELECT id FROM companies WHERE ticker = ?", (symbol,)).fetchone()[0]
 
-        # A) Pull raw financials
+    tk = yf.Ticker(symbol)
+    # Filter only available base metrics to avoid KeyErrors
+    available = tk.financials.index.tolist()
+    valid_base = [m for m in base_metrics if m in available]
+    if not valid_base:
+        print(f"⚠️ No base metrics available for {symbol}, skipping.")
+        continue
+
+    try:
+        # Pull raw financials
         fin = (
             tk.financials
-              .loc[base_metrics]
+              .loc[valid_base]
               .reset_index()
               .melt(id_vars="index", var_name="Date", value_name="Value")
               .rename(columns={"index": "Metric"})
         )
         fin["Year"] = pd.to_datetime(fin["Date"]).dt.year
 
-        # B) Compute Revenue Growth (YoY)
+        # Compute Revenue Growth (YoY)
         rev = (
             fin[fin.Metric == "Total Revenue"]
                .sort_values("Year")[ ["Year", "Value"] ]
@@ -123,8 +135,8 @@ for symbol in tickers:
             })
         rev_growth_df = pd.DataFrame(growth_rows)
 
-        # C) Pull .info and compute extra metrics
-        info     = tk.info
+        # Pull .info and compute extra metrics
+        info = tk.info
         price    = info.get("currentPrice")
         rev_tot  = info.get("totalRevenue")
         ni       = info.get("netIncomeToCommon")
@@ -155,7 +167,6 @@ for symbol in tickers:
             "EV/EBITDA":              (info.get("enterpriseValue") / ebitda) if info.get("enterpriseValue") and ebitda else None,
         }
 
-        # D) Combine all dataframes
         this_year  = pd.Timestamp.now().year
         extra_rows = [
             {"Metric": m, "Date": f"{this_year}-01-01", "Value": v, "Year": this_year}
@@ -164,17 +175,13 @@ for symbol in tickers:
         extra_df   = pd.DataFrame(extra_rows)
         full       = pd.concat([fin, rev_growth_df, extra_df], ignore_index=True)
 
-        # E) Insert into DB
-        cursor.execute("INSERT OR IGNORE INTO companies (ticker) VALUES (?)", (symbol,))
-        conn.commit()
-        cid = cursor.execute("SELECT id FROM companies WHERE ticker = ?", (symbol,)).fetchone()[0]
-
+        # Insert financial records
         for _, row in full.iterrows():
             mid = metric_map.get(row["Metric"])
             if mid and pd.notna(row["Value"]):
                 cursor.execute(
                     "INSERT INTO financials (company_id, metric_id, year, value) VALUES (?, ?, ?, ?)",
-                    (cid, mid, int(row["Year"]), float(row["Value"]))
+                    (company_id, mid, int(row["Year"]), float(row["Value"]))
                 )
         conn.commit()
         print(f"✅ Saved {symbol}")
