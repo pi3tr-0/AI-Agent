@@ -3,6 +3,7 @@ from src import fileParser
 from src import summarizer
 from dotenv import load_dotenv
 import os
+from pydantic_core import from_json
 
 load_dotenv()  # Load variables from .env file
 api_key = os.getenv("GEMINI_API_KEY") # Access the variable
@@ -20,11 +21,25 @@ with col2:
     )
 
 if st.button("Submit", type="primary"):
+    data = uploaded_file.read()
     if option == "summarizer":
-        st.write(summarizer.SummarizeFile(uploaded_file, api_key).output)
+        fileParser_output = fileParser.ParseFile(data, api_key).output
+        
+        #string output in JSON
+        json = fileParser_output.model_dump_json()
+
+        #TODO: updateDb function if requirements met
+
+        st.write(summarizer.SummarizeFile(data, api_key).output)
+
     elif option == "anomaly-detection":
         st.write("anomaly-detection")
     elif option == "forecast":
         st.write("forecast")
     else: 
-        st.write(fileParser.ParseFile(uploaded_file, api_key).output)
+        fileParser_output = fileParser.ParseFile(data, api_key).output
+
+        #string output in JSON
+        json = fileParser_output.model_dump_json()
+        
+        #TODO: updateDb function
