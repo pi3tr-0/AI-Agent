@@ -4,5 +4,5 @@ yfinance
 python-dotenv
 openai
 pypdf
-pydantic_ai
+pydantic-ai
 google-generativeai
