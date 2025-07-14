@@ -1,9 +1,9 @@
 {
     "year": 2026,
-    "ticker": "AAPL",
+    "ticker": "ABNB",
     "eatinghabits": "apple only",
-    "totalrevenue": 12345678,
-    "EBITDA": 0,
-    "netincome": 0,
+    "totalrevenue": 101010101,
+    "EBITDA": 1011011,
+    "netincome": 10122,
     "ignoredticker": "EBITDA, netincome"
 }
