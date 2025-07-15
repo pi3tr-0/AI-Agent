@@ -25,9 +25,8 @@ if st.button("Submit", type="primary"):
     data = uploaded_file.read()
     if option == "summarizer":
         fileParser_output = fileParser.ParseFile(data, api_key).output
-        
-        #string output in JSON
-        json = fileParser_output.model_dump()
+
+        #TODO: updateDb function if requirements met
 
         st.write(summarizer.SummarizeFile(data, api_key).output)
 
