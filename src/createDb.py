@@ -4,33 +4,27 @@ import pandas as pd
 import os
 
 # Define paths
-BASE_DIR = os.path.dirname("/Users/admin/Desktop/AI-Agent/src")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_DIR = os.path.join(BASE_DIR, "..", "util", "database")
 os.makedirs(DB_DIR, exist_ok=True)
 DB_PATH = os.path.join(DB_DIR, "finance_relational.db")
 
-# Metrics
-base_metrics = [
-    "Total Revenue", "Net Income", "Diluted EPS", "Gross Profit", "EBITDA", "EBIT",
-    "Pretax Income", "Tax Provision", "Research And Development",
-    "Selling General And Administration", "Cost Of Revenue", "Total Expenses",
-    "Interest Expense", "Normalized Income"
-]
+# Delete old DB
+if os.path.exists(DB_PATH):
+    os.remove(DB_PATH)
 
-derived_metrics = [
-    "Revenue Growth", "Operating Margin", "EBITDA Margin", "Net Margin",
-    "Shares Outstanding", "Trailing EPS", "Forward EPS", "Dividends Per Share",
+# Only include these metrics
+included_metrics = [
+    "Total Revenue", "Revenue Growth", "EBITDA", "EBITDA Margin", "Operating Margin",
+    "Net Income", "Profit Margin", "Shares Outstanding", "Trailing EPS", "Dividends Per Share",
     "Dividend Yield", "Price/Sales Ratio", "Price/Earnings Ratio", "Price/Book Ratio",
-    "EV/EBITDA", "ROA", "ROE", "Debt/Capital Ratio", "Equity/Assets Ratio",
-    "Total Debt/EBITDA", "EBITDA/Interest Expense"
+    "EV/EBITDA", "ROA", "ROE"
 ]
-
-all_metrics = base_metrics + derived_metrics
 
 # Tickers to process
 tickers = ["META", "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "NFLX", "ADBE", "INTC"]
 
-def ingest_ticker(symbol, cursor, conn, metric_map, base_metrics):
+def ingest_ticker(symbol, cursor, conn, metric_map):
     print(f"⏳ Processing {symbol}...")
     cursor.execute("INSERT OR IGNORE INTO companies (ticker) VALUES (?)", (symbol,))
     conn.commit()
@@ -39,10 +33,7 @@ def ingest_ticker(symbol, cursor, conn, metric_map, base_metrics):
 
     try:
         available = tk.financials.index.tolist()
-        valid_base = [m for m in base_metrics if m in available]
-        if not valid_base:
-            print(f"⚠️ No base metrics available for {symbol}, skipping.")
-            return
+        valid_base = [m for m in ["Total Revenue", "Net Income", "EBITDA"] if m in available]
 
         fin = (
             tk.financials
@@ -53,6 +44,7 @@ def ingest_ticker(symbol, cursor, conn, metric_map, base_metrics):
         )
         fin["Year"] = pd.to_datetime(fin["Date"]).dt.year
 
+        # Revenue Growth
         rev = fin[fin.Metric == "Total Revenue"].sort_values("Year")[["Year", "Value"]].dropna().reset_index(drop=True)
         growth_rows = []
         for i in range(1, len(rev)):
@@ -65,6 +57,7 @@ def ingest_ticker(symbol, cursor, conn, metric_map, base_metrics):
             })
         rev_growth_df = pd.DataFrame(growth_rows)
 
+        # Extra ratios from info
         info = tk.info
         ebitda = info.get("ebitda")
         debt = info.get("totalDebt")
@@ -75,16 +68,11 @@ def ingest_ticker(symbol, cursor, conn, metric_map, base_metrics):
         extra = {
             "Operating Margin": info.get("operatingMargins"),
             "EBITDA Margin": info.get("ebitdaMargins"),
-            "Net Margin": info.get("profitMargins"),
+            "Profit Margin": info.get("profitMargins"),
             "ROA": info.get("returnOnAssets"),
             "ROE": info.get("returnOnEquity"),
-            "Debt/Capital Ratio": (debt / (debt + eqty)) if debt and eqty else None,
-            "Equity/Assets Ratio": (eqty / assets) if eqty and assets else None,
-            "Total Debt/EBITDA": (debt / ebitda) if debt and ebitda else None,
-            "EBITDA/Interest Expense": (ebitda / interest) if ebitda and interest else None,
             "Shares Outstanding": info.get("sharesOutstanding"),
             "Trailing EPS": info.get("trailingEps"),
-            "Forward EPS": info.get("forwardEps"),
             "Dividends Per Share": info.get("dividendRate"),
             "Dividend Yield": info.get("dividendYield"),
             "Price/Sales Ratio": info.get("priceToSalesTrailing12Months"),
@@ -99,7 +87,12 @@ def ingest_ticker(symbol, cursor, conn, metric_map, base_metrics):
             for m, v in extra.items() if v is not None
         ]
         extra_df = pd.DataFrame(extra_rows)
+
+        # Combine all
         full = pd.concat([fin, rev_growth_df, extra_df], ignore_index=True)
+
+        # Filter to only included metrics
+        full = full[full["Metric"].isin(included_metrics)]
 
         for _, row in full.iterrows():
             mid = metric_map.get(row["Metric"])
@@ -143,7 +136,7 @@ CREATE TABLE financials (
 """)
 
 # Seed metrics
-for m in all_metrics:
+for m in included_metrics:
     cursor.execute("INSERT INTO metrics (name) VALUES (?)", (m,))
 conn.commit()
 
@@ -153,7 +146,5 @@ metric_map = {name: mid for mid, name in cursor.execute("SELECT id, name FROM me
 # Process tickers
 if __name__ == "__main__":
     for symbol in tickers:
-        ingest_ticker(symbol, cursor, conn, metric_map, base_metrics)
+        ingest_ticker(symbol, cursor, conn, metric_map)
     conn.close()
-
-conn.close()
