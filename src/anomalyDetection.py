@@ -3,59 +3,68 @@
 historical = """
 {"2019" : { "revenueGrowth": 0.1, "operatingMargin": 0.2 },
 "2020" : { "revenueGrowth": 0.2, "operatingMargin": 0.4 },
-"2021" : { "revenueGrowth": 0.1, "operatingMargin": 0.1 }}
-"""
-
-# Get JSON string with current year's data
-
-current = """
-{"revenueGrowth": 0.5, "operatingMargin": 0}
+"2021" : { "revenueGrowth": 0.3, "operatingMargin": 0.1 },
+"2022" : { "revenueGrowth": 0.4, "operatingMargin": 0.2 },
+"2023" : { "revenueGrowth": -0.2, "operatingMargin": 0.21, "ebitda": 0 }}
 """
 
 import pandas as pd
 import json
 
-def FindAnomaly(historicalJSON, currentJSON):
-    historical_dict = json.loads(historicalJSON)
-    current_dict = json.loads(currentJSON)
-    average_dict = HistoricalMatricesAverages(historical_dict)
-
-    if "revenueGrowth" in current_dict:
-        RevenueGrowth(current_dict["revenueGrowth"], average_dict["revenueGrowth"])
+def FindAnomaly(historicalJSON: str):
+    # load and sort the dict (list of tuples)
+    totalDict = sorted((json.loads(historicalJSON)).items())
     
+    # current year and past years dict
+    currentYearDict = totalDict[-1][1]
+    pastYearsDict = dict(totalDict[:-1])
+    
+    # Comparison 1: Simple Average Comparison
+    historicalSimpleAveragesDict = HistoricalSimpleAverages(pastYearsDict)
+    simpleAveragesComparison = CompareSimpleAverages(currentYearDict, historicalSimpleAveragesDict)
+
+    print(simpleAveragesComparison)
 
     return
 
 # Compute the historical averages for comparison
-def HistoricalMatricesAverages(historical_dict):
-    average_dict = dict()
+def HistoricalSimpleAverages(pastYearsDict):
+    averageDict = dict()
 
-    for year in historical_dict:
-        for metric in historical_dict[year]: 
-            if metric in average_dict:
-                average_dict[metric] += historical_dict[year][metric]
+    for year in pastYearsDict:
+        for metric in pastYearsDict[year]: 
+            if metric in averageDict:
+                averageDict[metric] += pastYearsDict[year][metric]
             else:
-                average_dict[metric] = historical_dict[year][metric]
-    
-    num_year = len(historical_dict)
-    for key in average_dict:
-        average_dict[key] = average_dict[key] / num_year
+                averageDict[metric] = pastYearsDict[year][metric]
 
-    return average_dict
+    num_year = len(pastYearsDict)
+    for key in averageDict:
+        averageDict[key] = averageDict[key] / num_year
 
+    return averageDict
 
-def RevenueGrowth():
-    return
+# Simple Averages Comparison
+def CompareSimpleAverages(currentYear, historicalSimpleAverages):
+    significantValue = 0.1 # % change threshold
 
-def EBITDAMargin():
-    return
+    changes = dict() # record changes (if any) in a dict
 
-def OperatingMargin():
-    return
-
+    for key in currentYear:
+        if key not in historicalSimpleAverages: # edgecase: no historical data
+            changes[key] = "no historical data"
+            continue
+        change = (currentYear[key] - historicalSimpleAverages[key])/historicalSimpleAverages[key]
+        if change > significantValue:
+            changes[key] = "increases"
+        elif change < -significantValue:
+            changes[key] = "decreases"
+        else:
+            changes[key] = "no significant change"
+    return changes
 
 def main():
-    FindAnomaly(historical, current)
+    FindAnomaly(historical)
 
 
 
