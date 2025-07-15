@@ -40,9 +40,7 @@ if st.button("Submit", type="primary"):
     else: 
         fileParser_output = fileParser.ParseFile(data, api_key).output
 
-        #string output in JSON
-        string = fileParser_output.model_dump_json()
-        json = json.loads(string)
+        json = json.loads(fileParser_output)
         # json = {"year": 2026, "ticker": "AAPL", "ebitda": 1000, "totalrevenue": 5000}
         if update_db_from_dict(json) == 1:
             st.success("Database updated successfully.")
