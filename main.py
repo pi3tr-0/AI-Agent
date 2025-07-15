@@ -23,9 +23,6 @@ if st.button("Submit", type="primary"):
     data = uploaded_file.read()
     if option == "summarizer":
         fileParser_output = fileParser.ParseFile(data, api_key).output
-        
-        #string output in JSON
-        json = fileParser_output.model_dump_json()
 
         #TODO: updateDb function if requirements met
 
@@ -37,10 +34,6 @@ if st.button("Submit", type="primary"):
         st.write("forecast")
     else: 
         fileParser_output = fileParser.ParseFile(data, api_key).output
-
-        #string output in JSON
-        #json = fileParser_output.model_dump_json()
-
         st.write(fileParser_output)
         
         #TODO: updateDb function

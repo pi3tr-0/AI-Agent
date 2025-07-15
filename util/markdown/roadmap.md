@@ -4,7 +4,7 @@
 
 ## Phase 1 – Core Intelligence Layer
 
-![Phase 1 Structure](./util/image/phase%20structure/Phase%201.png)
+![Phase 1 Structure](../image/phase%20structure/Phase%201.png)
 
 ### 1. Financial Report Summarizer
 - **Purpose:** Automatically generate concise summaries of quarterly earnings call transcripts or 10-K/10-Q filings.
