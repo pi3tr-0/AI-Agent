@@ -1,11 +1,12 @@
 import streamlit as st
 from src import fileParser
 from src import summarizer
+from src import anomalyDetection
 from dotenv import load_dotenv
 import os
 
-load_dotenv()  # Load variables from .env file
-api_key = os.getenv("GEMINI_API_KEY") # Access the variable
+load_dotenv()
+api_key = os.getenv("GEMINI_API_KEY")
 
 col1, col2 = st.columns(2)
 
@@ -29,9 +30,19 @@ if st.button("Submit", type="primary"):
         st.write(summarizer.SummarizeFile(data, api_key).output)
 
     elif option == "anomaly-detection":
-        st.write("anomaly-detection")
+        sampleJSON =  """
+                {"2019" : { "revenueGrowth": 0.1, "operatingMargin": -0.1 },
+                "2020" : { "revenueGrowth": 0.2, "operatingMargin": -0.2 },
+                "2021" : { "revenueGrowth": 0.3, "operatingMargin": -0.3 },
+                "2022" : { "revenueGrowth": 0.4, "operatingMargin": -0.4 },
+                "2023" : { "revenueGrowth": 0.45, "operatingMargin": -1, "ebitda": 0 }}
+                """
+        st.write(sampleJSON)
+        st.write(anomalyDetection.FindAnomaly(sampleJSON))
+    
     elif option == "forecast":
         st.write("forecast")
+    
     else: 
         fileParser_output = fileParser.ParseFile(data, api_key).output
         st.write(fileParser_output)
