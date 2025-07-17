@@ -5,8 +5,37 @@ from src import anomalyDetection
 from dotenv import load_dotenv
 import os
 
+# API key
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
+
+# Helper function (for readability)
+
+def Summarizer():
+    fileParser_output = fileParser.ParseFile(data, api_key).output
+
+    #TODO: updateDb function if requirements met
+
+    st.write(summarizer.SummarizeFile(data, api_key).output)
+
+def AnomalyDetection():
+    sampleJSON =  """
+                {"2019" : { "revenueGrowth": 0.1, "operatingMargin": -0.1 },
+                "2020" : { "revenueGrowth": 0.2, "operatingMargin": -0.2 },
+                "2021" : { "revenueGrowth": 0.3, "operatingMargin": -0.3 },
+                "2022" : { "revenueGrowth": 0.4, "operatingMargin": -0.4 },
+                "2023" : { "revenueGrowth": 0.45, "operatingMargin": -1, "ebitda": 0 }}
+                """
+    st.write(sampleJSON)
+    st.write(anomalyDetection.FindAnomaly(sampleJSON))
+
+def FileParser():
+    fileParser_output = fileParser.ParseFile(data, api_key).output
+    st.write(fileParser_output)
+        
+    #TODO: updateDb function
+
+# Streamlit Interface
 
 col1, col2 = st.columns(2)
 
@@ -23,29 +52,13 @@ with col2:
 if st.button("Submit", type="primary"):
     data = uploaded_file.read()
     if option == "summarizer":
-        fileParser_output = fileParser.ParseFile(data, api_key).output
-
-        #TODO: updateDb function if requirements met
-
-        st.write(summarizer.SummarizeFile(data, api_key).output)
+        Summarizer()
 
     elif option == "anomaly-detection":
-        sampleJSON =  """
-                {"2019" : { "revenueGrowth": 0.1, "operatingMargin": -0.1 },
-                "2020" : { "revenueGrowth": 0.2, "operatingMargin": -0.2 },
-                "2021" : { "revenueGrowth": 0.3, "operatingMargin": -0.3 },
-                "2022" : { "revenueGrowth": 0.4, "operatingMargin": -0.4 },
-                "2023" : { "revenueGrowth": 0.45, "operatingMargin": -1, "ebitda": 0 }}
-                """
-        st.write(sampleJSON)
-        st.write(anomalyDetection.FindAnomaly(sampleJSON))
+        AnomalyDetection()
     
     elif option == "forecast":
         st.write("forecast")
     
     else: 
-        fileParser_output = fileParser.ParseFile(data, api_key).output
-        st.write(fileParser_output)
-        
-        #TODO: updateDb function
-        #test
+        FileParser()
