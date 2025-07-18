@@ -7,3 +7,4 @@ pypdf
 pydantic-ai
 google-generativeai
 html5lib
+scikit-learn

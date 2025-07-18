@@ -1,14 +1,44 @@
 import streamlit as st
 from src import fileParser
 from src import summarizer
+from src import anomalyDetection
 from dotenv import load_dotenv
 import os
 from src.updateDb import update_db_from_dict
 from src.dbextract import extract_ticker_data
 import json
 
-load_dotenv()  # Load variables from .env file
-api_key = os.getenv("GEMINI_API_KEY") # Access the variable
+# API key
+load_dotenv()
+api_key = os.getenv("GEMINI_API_KEY")
+
+# Helper function (for readability)
+
+def Summarizer():
+    fileParser_output = fileParser.ParseFile(data, api_key).output
+
+    #TODO: updateDb function if requirements met
+
+    st.write(summarizer.SummarizeFile(data, api_key).output)
+
+def AnomalyDetection():
+    sampleJSON =  """
+                {"2019" : { "revenueGrowth": 0.1, "operatingMargin": -0.1 },
+                "2020" : { "revenueGrowth": 0.2, "operatingMargin": -0.2 },
+                "2021" : { "revenueGrowth": 0.3, "operatingMargin": -0.3 },
+                "2022" : { "revenueGrowth": 0.4, "operatingMargin": -0.4 },
+                "2023" : { "revenueGrowth": 0.45, "operatingMargin": -1, "ebitda": 0 }}
+                """
+    st.write(sampleJSON)
+    st.write(anomalyDetection.FindAnomaly(sampleJSON))
+
+def FileParser():
+    fileParser_output = fileParser.ParseFile(data, api_key).output
+    st.write(fileParser_output)
+        
+    #TODO: updateDb function
+
+# Streamlit Interface
 
 col1, col2 = st.columns(2)
 
@@ -25,27 +55,13 @@ with col2:
 if st.button("Submit", type="primary"):
     # data = uploaded_file.read()
     if option == "summarizer":
-        fileParser_output = fileParser.ParseFile(data, api_key).output
-
-        st.write(summarizer.SummarizeFile(data, api_key).output)
+        Summarizer()
 
     elif option == "anomaly-detection":
-        st.write(extract_ticker_data('AAPL')) # example
+        AnomalyDetection()
     
     elif option == "forecast":
         st.write("forecast")
-
+    
     else: 
-        fileParser_output = dict(fileParser.ParseFile(data, api_key).output)
-        st.write(fileParser_output)
-
-        # json = {"year": 2026, "ticker": "AAPL", "ebitda": 1000, "totalrevenue": 5000}
-        if update_db_from_dict(fileParser_output) == 1:
-            st.success("Database updated successfully.")
-        elif update_db_from_dict(fileParser_output) == -1:
-            st.error("Failed to update database, Missing ticker or year.")
-        elif update_db_from_dict(fileParser_output) == -2:
-            st.error("Failed to update database, Could not find ticker.")
-        else:
-            st.error("Failed to update database, Unknown error.")
-        
+        FileParser()
