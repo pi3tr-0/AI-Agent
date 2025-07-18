@@ -6,3 +6,4 @@ openai
 pypdf
 pydantic-ai
 google-generativeai
+html5lib

@@ -1,6 +1,6 @@
 import sqlite3
 import os
-from src.createdb import ingest_ticker, included_metrics
+from src.createDb import ingest_ticker, included_metrics
 
 # Database path
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "util", "database", "finance_relational.db")
