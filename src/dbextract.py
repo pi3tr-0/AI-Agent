@@ -55,7 +55,7 @@ def check_database():
 def extract_ticker_data(ticker: str, debug: bool = False) -> dict:
     """
     Query the database for all metrics of a given ticker,
-    returning a dict mapping each year (as string) to a
+    Returns a dict mapping each year (as string) to a
     dict of lowerCamelCase metric names and their values.
     """
     if debug:
@@ -116,13 +116,15 @@ def extract_ticker_data(ticker: str, debug: bool = False) -> dict:
 
     data = {}
     for year, metric_name, value in rows:
-        year_str = str(year)
-        normalized_name = normalize_metric(metric_name)
-        
-        if debug and len(data) == 0:  # Print first conversion as example
-            print(f"DEBUG: Converting '{metric_name}' -> '{normalized_name}'")
-        
-        data.setdefault(year_str, {})[normalized_name] = value
+        if year == 2025: break
+        else:
+            year_str = str(year)
+            normalized_name = normalize_metric(metric_name)
+            
+            if debug and len(data) == 0:  # Print first conversion as example
+                print(f"DEBUG: Converting '{metric_name}' -> '{normalized_name}'")
+            
+            data.setdefault(year_str, {})[normalized_name] = value
     
     if debug:
         print(f"DEBUG: Final data structure has {len(data)} years")
@@ -135,7 +137,7 @@ def extract_ticker_data(ticker: str, debug: bool = False) -> dict:
 
 def extract_ticker_json(ticker: str, debug: bool = False) -> str:
     """
-    Wrapper to return the extracted data as a JSON-formatted string.
+    Returns the extracted data as a JSON-formatted string.
     """
     data = extract_ticker_data(ticker, debug=debug)
     return json.dumps(data, indent=2)
