@@ -5,7 +5,7 @@ from src import anomalyDetection
 from dotenv import load_dotenv
 import os
 from src.updateDb import update_db_from_dict
-from src.dbextract import extract_ticker_data
+from src.dbextract import extract_ticker_data, extract_ticker_json
 import json
 
 # API key
@@ -14,25 +14,22 @@ api_key = os.getenv("GEMINI_API_KEY")
 
 # Helper function (for readability)
 
-def Summarizer():
+def Summarizer(data):
     fileParser_output = fileParser.ParseFile(data, api_key).output
 
     #TODO: updateDb function if requirements met
 
     st.write(summarizer.SummarizeFile(data, api_key).output)
 
-def AnomalyDetection():
-    sampleJSON =  """
-                {"2019" : { "revenueGrowth": 0.1, "operatingMargin": -0.1 },
-                "2020" : { "revenueGrowth": 0.2, "operatingMargin": -0.2 },
-                "2021" : { "revenueGrowth": 0.3, "operatingMargin": -0.3 },
-                "2022" : { "revenueGrowth": 0.4, "operatingMargin": -0.4 },
-                "2023" : { "revenueGrowth": 0.45, "operatingMargin": -1, "ebitda": 0 }}
-                """
-    st.write(sampleJSON)
-    st.write(anomalyDetection.FindAnomaly(sampleJSON))
+def AnomalyDetection(data):
+    fileParser_output = fileParser.ParseFile(data, api_key).output
+    output = dict(fileParser_output)
+    ticker = output["ticker"]
+    json = extract_ticker_json(ticker)
+    st.write(json)
+    st.write(anomalyDetection.FindAnomaly(json))
 
-def FileParser():
+def FileParser(data):
     fileParser_output = fileParser.ParseFile(data, api_key).output
     st.write(fileParser_output)
         
@@ -53,15 +50,15 @@ with col2:
     )
 
 if st.button("Submit", type="primary"):
-    # data = uploaded_file.read()
+    data = uploaded_file.read()
     if option == "summarizer":
-        Summarizer()
+        Summarizer(data)
 
     elif option == "anomaly-detection":
-        AnomalyDetection()
+        AnomalyDetection(data)
     
     elif option == "forecast":
         st.write("forecast")
     
     else: 
-        FileParser()
+        FileParser(data)
