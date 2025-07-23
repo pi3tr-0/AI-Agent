@@ -20,7 +20,7 @@ def FindAnomaly(JSON: str):
     totalDict = sorted((json.loads(JSON)).items())
     
     # current year and past years dict
-    currentYear = int(totalDict[-1][1])
+    currentYear = int(totalDict[-1][0])
     currentYearDict = totalDict[-1][1]
     pastYearsDict = dict(totalDict[:-1])
     
