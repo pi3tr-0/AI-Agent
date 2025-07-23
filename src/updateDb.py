@@ -79,14 +79,6 @@ def update_db_from_dict(data: dict):
                 cursor.execute(
                     "UPDATE financials SET value = ? WHERE id = ?", (v, exists[0])
                 )
-        else:
-            cursor.execute(
-                """
-                INSERT INTO financials (company_id, metric_id, year, value)
-                VALUES (?, ?, ?, ?)
-                """,
-                (company_id, metric_id, year, v if v is not None else "n/a"),
-            )
         updates += 1
 
     conn.commit()

@@ -116,15 +116,13 @@ def extract_ticker_data(ticker: str, debug: bool = False) -> dict:
 
     data = {}
     for year, metric_name, value in rows:
-        if year == 2025: break
-        else:
-            year_str = str(year)
-            normalized_name = normalize_metric(metric_name)
+        year_str = str(year)
+        normalized_name = normalize_metric(metric_name)
             
-            if debug and len(data) == 0:  # Print first conversion as example
-                print(f"DEBUG: Converting '{metric_name}' -> '{normalized_name}'")
+        if debug and len(data) == 0:  # Print first conversion as example
+            print(f"DEBUG: Converting '{metric_name}' -> '{normalized_name}'")
             
-            data.setdefault(year_str, {})[normalized_name] = value
+        data.setdefault(year_str, {})[normalized_name] = value
     
     if debug:
         print(f"DEBUG: Final data structure has {len(data)} years")

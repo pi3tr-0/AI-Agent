@@ -16,9 +16,7 @@ api_key = os.getenv("GEMINI_API_KEY")
 
 def Summarizer(data):
     fileParser_output = fileParser.ParseFile(data, api_key).output
-
-    #TODO: updateDb function if requirements met
-
+    update_db_from_dict(dict(fileParser_output))
     st.write(summarizer.SummarizeFile(data, api_key).output)
 
 def AnomalyDetection(data):
@@ -26,14 +24,19 @@ def AnomalyDetection(data):
     output = dict(fileParser_output)
     ticker = output["ticker"]
     json = extract_ticker_json(ticker)
-    st.write(json)
     st.write(anomalyDetection.FindAnomaly(json))
 
 def FileParser(data):
     fileParser_output = fileParser.ParseFile(data, api_key).output
+    output = dict(fileParser_output)
+    ticker = output["ticker"]
+    json = extract_ticker_json(ticker)
+    st.write(json)
+    st.write("testtt")
+    update_db_from_dict(output)
+    json = extract_ticker_json(ticker)
+    st.write(json)
     st.write(fileParser_output)
-        
-    #TODO: updateDb function
 
 # Streamlit Interface
 
