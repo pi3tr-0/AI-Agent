@@ -1,3 +1,8 @@
+"""
+This script updates a SQLite database with financial data for a specific company.
+It takes a dictionary containing financial metrics and inserts them into the database.
+"""
+
 import os
 import sqlite3
 import yfinance as yf

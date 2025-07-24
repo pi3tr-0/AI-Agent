@@ -1,3 +1,9 @@
+"""
+Creates a SQLite database for financial metrics of various companies.
+This script fetches financial data from Yahoo Finance, processes it,
+and stores it in a structured format in the database.
+"""
+
 import os
 import sqlite3
 import yfinance as yf
@@ -20,7 +26,7 @@ included_metrics = ["total revenue", #dollars
 
 included_metrics = [m.strip() for m in included_metrics]
 
-tickers = ["AAPL", "ATEC", "NESN", "TM", "MSFT"]
+tickers = ["AAPL", "ATEC", "NESN", "TM", "MSFT", "AMZN", "NFLX"]
 
 quarters = ["Q1 2024", "Q2 2024", "Q3 2024", "Q4 2024", "Q1 2025"]
 
