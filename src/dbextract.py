@@ -1,194 +1,121 @@
-import sqlite3
-import json
+"""
+This script takes in a ticker and outputs a dictionary containing the financials of every quarter for that ticker.
+"""
+
 import os
-import re
-import sys
+import sqlite3
+import yfinance as yf
+import streamlit as st
 
-# Locate the DB alongside createDb.py
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_DIR = os.path.join(BASE_DIR, "..", "util", "database")
-DB_PATH = os.path.join(DB_DIR, "finance_relational.db")
+finance_db = "../util/database/finance.db"
 
+expected_output = {
+    "Q1 2024": {
+        "total revenue": 100000000000,
+        "basic eps": 5.00,
+        "dividend yield": 0.6,  
+        "dividend rate": 0.30,  
+        "ebitda": 30000000000,  
+        "revenue growth": 10.0, 
+        "ebitda margin": 30.0,  
+        "net income": 20000000000, 
+        "basic average shares": 15000000000, 
+        "profit margin": 20.0, 
+        "operating margin": 25.0
+    },
+    "Q2 2024": {
+        "total revenue": 110000000000,
+        "basic eps": 5.50,
+        "dividend yield": 0.65,  
+        "dividend rate": 0.35,  
+        "ebitda": 33000000000,  
+        "revenue growth": 12.0, 
+        "ebitda margin": 32.0,  
+        "net income": 22000000000, 
+        "basic average shares": 15500000000, 
+        "profit margin": 22.0, 
+        "operating margin": 27.0
+    },
+    "Q3 2024": {
+        "total revenue": 120000000000,
+        "basic eps": 6.00,
+        "dividend yield": 0.7,  
+        "dividend rate": 0.40,  
+        "ebitda": 36000000000,  
+        "revenue growth": 15.0, 
+        "ebitda margin": 35.0,  
+        "net income": 24000000000, 
+        "basic average shares": 16000000000, 
+        "profit margin": 24.0, 
+        "operating margin": 30.0
+    },
+    "Q4 2024": {
+        "total revenue": 130000000000,
+        "basic eps": 6.50,
+        "dividend yield": 0.75,  
+        "dividend rate": 0.45,  
+        "ebitda": 39000000000,  
+        "revenue growth": 18.0, 
+        "ebitda margin": 38.0,  
+        "net income": 26000000000, 
+        "basic average shares": 16500000000, 
+        "profit margin": 26.0, 
+        "operating margin": 33.0
+    },
+    "Q1 2025": {
+        "total revenue": 140000000000,
+        "basic eps": 7.00,
+        "dividend yield": 0.8,  
+        "dividend rate": 0.50,  
+        "ebitda": 42000000000,  
+        "revenue growth": 20.0, 
+        "ebitda margin": 40.0,  
+        "net income": 28000000000, 
+        "basic average shares": 17000000000, 
+        "profit margin": 28.0, 
+        "operating margin": 35.0
+    }
+}
 
-def normalize_metric(name: str) -> str:
+def extract_ticker_data(ticker):
     """
-    Convert metrics from Title Case to lowerCamelCase, e.g.
-    "Total Revenue" -> "totalRevenue"
+    Extracts financial data for a given ticker from the SQLite database.
+    
+    Args:
+        ticker (str): The stock ticker symbol.
+    
+    Returns:
+        dict: A dictionary containing financial data for each quarter.
     """
-    parts = re.split(r'[^A-Za-z0-9]+', name)
-    parts = [p for p in parts if p]
-    if not parts:
-        return ""
-    first, *rest = parts
-    return first.lower() + "".join(p.capitalize() for p in rest)
-
-
-def check_database():
-    """Check if database exists and has data"""
-    if not os.path.exists(DB_PATH):
-        print(f"ERROR: Database not found at {DB_PATH}")
-        return False
     
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    # Fetch all quarters for the given ticker
+    cursor.execute('''
+        SELECT quarter, metric, value FROM financials WHERE ticker = ?
+    ''', (ticker,))
     
-    # Check if tables exist
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    tables = cursor.fetchall()
-    print(f"DEBUG: Tables in database: {[t[0] for t in tables]}")
-    
-    # Check record counts
-    for table in ['companies', 'metrics', 'financials']:
-        cursor.execute(f"SELECT COUNT(*) FROM {table}")
-        count = cursor.fetchone()[0]
-        print(f"DEBUG: {table} table has {count} records")
-    
-    # Check available tickers
-    cursor.execute("SELECT ticker FROM companies")
-    tickers = cursor.fetchall()
-    print(f"DEBUG: Available tickers: {[t[0] for t in tickers]}")
-    
-    conn.close()
-    return True
-
-
-def extract_ticker_data(ticker: str, debug: bool = False) -> dict:
-    """
-    Query the database for all metrics of a given ticker,
-    Returns a dict mapping each year (as string) to a
-    dict of lowerCamelCase metric names and their values.
-    """
-    if debug:
-        print(f"\nDEBUG: Extracting data for ticker: {ticker}")
-        print(f"DEBUG: Database path: {DB_PATH}")
-        
-        if not check_database():
-            return {}
-    
-    if not os.path.exists(DB_PATH):
-        print(f"ERROR: Database not found at {DB_PATH}")
-        return {}
-    
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    # First check if the ticker exists
-    cursor.execute(
-        "SELECT id FROM companies WHERE ticker = ?",
-        (ticker.upper(),)
-    )
-    company_result = cursor.fetchone()
-    
-    if not company_result:
-        if debug:
-            print(f"DEBUG: Ticker '{ticker}' not found in database")
-            # Show available tickers
-            cursor.execute("SELECT ticker FROM companies")
-            available = [row[0] for row in cursor.fetchall()]
-            print(f"DEBUG: Available tickers: {available}")
-        conn.close()
-        return {}
-    
-    company_id = company_result[0]
-    if debug:
-        print(f"DEBUG: Found company_id: {company_id} for ticker: {ticker}")
-    
-    # Now get the data
-    cursor.execute(
-        """
-        SELECT f.year, m.name, f.value
-        FROM financials AS f
-        JOIN companies AS c ON f.company_id = c.id
-        JOIN metrics   AS m ON f.metric_id = m.id
-        WHERE c.ticker = ?
-        ORDER BY f.year ASC
-        """,
-        (ticker.upper(),)
-    )
     rows = cursor.fetchall()
     
-    if debug:
-        print(f"DEBUG: Found {len(rows)} rows of data")
-        if rows:
-            print(f"DEBUG: Sample row: {rows[0]}")
+    # Process the fetched data into a structured dictionary
+    data = {}
+    for row in rows:
+        quarter, metric, value = row
+        if quarter not in data:
+            data[quarter] = {}
+        data[quarter][metric] = value
     
     conn.close()
-
-    data = {}
-    for year, metric_name, value in rows:
-        year_str = str(year)
-        normalized_name = normalize_metric(metric_name)
-            
-        if debug and len(data) == 0:  # Print first conversion as example
-            print(f"DEBUG: Converting '{metric_name}' -> '{normalized_name}'")
-            
-        data.setdefault(year_str, {})[normalized_name] = value
-    
-    if debug:
-        print(f"DEBUG: Final data structure has {len(data)} years")
-        if data:
-            first_year = list(data.keys())[0]
-            print(f"DEBUG: Metrics for {first_year}: {list(data[first_year].keys())}")
     
     return data
 
-
-def extract_ticker_json(ticker: str, debug: bool = False) -> str:
-    """
-    Returns the extracted data as a JSON-formatted string.
-    """
-    data = extract_ticker_data(ticker, debug=debug)
-    return json.dumps(data, indent=2)
-
-
-def test_extraction():
-    """Test function to verify extraction works"""
-    print("=== Testing Database Extraction ===")
-    print(f"Database path: {DB_PATH}")
-    print(f"Database exists: {os.path.exists(DB_PATH)}")
-    
-    if os.path.exists(DB_PATH):
-        # Test with debug mode
-        test_ticker = "AAPL"
-        print(f"\nTesting extraction for {test_ticker}:")
-        data = extract_ticker_data(test_ticker, debug=True)
-        
-        if data:
-            print(f"\nSuccess! Found data for {len(data)} years")
-            print("Sample output:")
-            print(json.dumps(data, indent=2)[:500] + "...")
-        else:
-            print("\nNo data found. Checking database...")
-            check_database()
-
-
 def main():
-    if len(sys.argv) == 1:
-        # No arguments, run test
-        test_extraction()
-    elif len(sys.argv) == 2:
-        ticker = sys.argv[1]
-        if ticker.lower() == "--test":
-            test_extraction()
-        else:
-            print(extract_ticker_json(ticker))
-    elif len(sys.argv) == 3 and sys.argv[2] == "--debug":
-        ticker = sys.argv[1]
-        print(extract_ticker_json(ticker, debug=True))
-    else:
-        print(f"Usage: {sys.argv[0]} TICKER [--debug]")
-        print(f"   or: {sys.argv[0]} --test")
-        sys.exit(1)
+    global conn, cursor
+    conn = sqlite3.connect(finance_db)
+    cursor = conn.cursor()
+    
+    # Example usage
+    st.write(extract_ticker_data("AAPL"))
 
+    conn.close()
 
 if __name__ == "__main__":
     main()
-
-# Example usage from another file:
-#
-# from dbextract import extract_ticker_data
-# data = extract_ticker_data('AAPL')
-# print(data)
-#
-# For debugging:
-# data = extract_ticker_data('AAPL', debug=True)
