@@ -200,16 +200,16 @@ def main():
         fill_db(ticker)
     
     # Print summary of what was inserted
-    cursor.execute('''
-        SELECT ticker, metric, COUNT(*) as count
-        FROM financials
-        GROUP BY ticker, metric
-        ORDER BY ticker, metric
-    ''')
+    # cursor.execute('''
+    #     SELECT ticker, metric, COUNT(*) as count
+    #     FROM financials
+    #     GROUP BY ticker, metric
+    #     ORDER BY ticker, metric
+    # ''')
     
-    print("\nSummary of data inserted:")
-    for row in cursor.fetchall():
-        print(f"{row[0]} - {row[1]}: {row[2]} quarters")
+    # print("\nSummary of data inserted:")
+    # for row in cursor.fetchall():
+    #     print(f"{row[0]} - {row[1]}: {row[2]} quarters")
     
     conn.close()
 
