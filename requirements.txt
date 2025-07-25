@@ -8,3 +8,5 @@ pydantic-ai
 google-generativeai
 html5lib
 scikit-learn
+pydantic-ai-slim[duckduckgo]
+pydantic-ai-slim[travily]

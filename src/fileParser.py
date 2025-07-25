@@ -36,6 +36,7 @@ def ParseFile(uploaded_file, api_key):
         pdfSummary: str = Field(description="A concise, factual summary of the source document's key contents, focusing on the financial data, performance highlights, and narrative points provided by the company or reporting body. This includes earnings results, revenue performance, business updates, segment-level insights, and any major changes disclosed in the document. Should reflect the tone and content of the report without adding interpretation or opinion.")
         analyst: Analyst
         ticker: str = Field(description="An abbreviation used to uniquely identify publicly traded shares of a particular stock")
+        period: str = Field(description="the quarter and year at which the report is produced, e.g. Q2 2025")
 
     
   
