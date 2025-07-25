@@ -3,8 +3,8 @@ from pydantic_ai.models.gemini import GeminiModel
 from pydantic_ai.providers.google_gla import GoogleGLAProvider
 from pydantic import BaseModel, Field
 
-def ParseFile(uploaded_file, api_key):
-    model = GeminiModel('gemini-2.5-flash', provider=GoogleGLAProvider(api_key=api_key))
+def ParseFile(uploaded_file, gemini_api_key):
+    model = GeminiModel('gemini-2.5-flash', provider=GoogleGLAProvider(api_key=gemini_api_key))
 
     class Financial(BaseModel):
         ticker: str = Field(description="An abbreviation used to uniquely identify publicly traded shares of a particular stock")
