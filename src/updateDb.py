@@ -8,8 +8,6 @@ import sqlite3
 import yfinance as yf
 import streamlit as st
 
-finance_db = "../util/database/finance.db"
-
 expected_output = {
     "ticker": "AAPL",
     "quarter": "Q2 2025",
@@ -27,22 +25,28 @@ expected_output = {
 }
 
 def update_db_from_dict(data):
+    finance_db = "util/database/finance.db"
+    conn = sqlite3.connect(finance_db)
+    cursor = conn.cursor()  
     # Insert financial data
     for metric, value in data.items():
         if metric != "ticker" and metric != "quarter":
-            cursor.execute('''
-                INSERT INTO financials (ticker, quarter, metric, value)
-                VALUES (?, ?, ?, ?)
-            ''', (data["ticker"], data["quarter"], metric, value))
+            year = data.get("year")
+            quarter = data.get("quarter")
+            if quarter != None and year is not None:
+                quarter_label = f"Q{quarter} {year}"
+                cursor.execute('''
+                    INSERT INTO financials (ticker, quarter, metric, value)
+                    VALUES (?, ?, ?, ?)
+                ''', (data["ticker"], quarter_label, metric, value))
 
     conn.commit()
+    conn.close()
+
 
 def main():
     global conn, cursor
-    conn = sqlite3.connect(finance_db)
-    cursor = conn.cursor()  
-    update_db_from_dict(expected_output)
-    conn.close()
+    # update_db_from_dict(expected_output)
 
 
 if __name__ == "__main__":

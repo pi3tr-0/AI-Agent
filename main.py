@@ -1,7 +1,6 @@
 import streamlit as st
 from dotenv import load_dotenv
-from src import fileParser
-from src import internetSearch
+from src import fileParser, internetSearch, sentimentAnalysis
 import os
 
 # Functions
@@ -9,10 +8,11 @@ def ParsePDFAndSearch(pdfBytes, gemini_api_key, tavily_api_key):
 
     # parse pdf
     fileParserOutput = dict(fileParser.ParseFile(pdfBytes, gemini_api_key).output)
-            
-    # to access financialMetrics: = dict(fileParserOutput["financialMetrics"])
-    # to access pdfSummary: = fileParserOutput["pdfSummary"]
-    # to access analyst: = dict(fileParserOutput["analyst"])
+
+    # required for json serialization (need to convert to native type)        
+    fileParserOutput["financialMetrics"] = dict(fileParserOutput["financialMetrics"])
+    fileParserOutput["analyst"] = dict(fileParserOutput["analyst"])
+
     ticker = fileParserOutput["ticker"]
     period = fileParserOutput["period"]
 
@@ -40,6 +40,10 @@ if prompt:
         content = ParsePDFAndSearch(pdfBytes, gemini_api_key, tavily_api_key)
         
         st.write(content)
+
+        sentiment = dict(sentimentAnalysis.AnalyzeSentiment(content, gemini_api_key).output)
+
+        st.write(sentiment)
 
     else:
         st.write("PDF Required")

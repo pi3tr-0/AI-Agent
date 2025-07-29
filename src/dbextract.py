@@ -7,8 +7,7 @@ import sqlite3
 import yfinance as yf
 import streamlit as st
 
-finance_db = "util/database/finance.db"
-
+finance_db = "../util/database/finance.db"
 conn = sqlite3.connect(finance_db)
 cursor = conn.cursor()
 
@@ -112,13 +111,12 @@ def extract_ticker_data(ticker):
 
 def main():
     global conn, cursor
-    conn = sqlite3.connect(finance_db)
-    cursor = conn.cursor()
+    # conn = sqlite3.connect(finance_db)
+    # cursor = conn.cursor()
     
     # Example usage
-    st.write(extract_ticker_data("AAPL"))
+    # st.write(extract_ticker_data("AAPL"))
 
-    conn.close()
 
 if __name__ == "__main__":
     main()
