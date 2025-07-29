@@ -7,9 +7,9 @@ import sqlite3
 import yfinance as yf
 import streamlit as st
 
-finance_db = "../util/database/finance.db"
-conn = sqlite3.connect(finance_db)
-cursor = conn.cursor()
+
+createdb_path = os.path.dirname(os.path.abspath(__file__))
+finance_db = os.path.join(createdb_path, "../util/database/finance.db")
 
 expected_output = {
     "Q1 2024": {
@@ -89,6 +89,8 @@ def extract_ticker_data(ticker):
     Returns:
         dict: A dictionary containing financial data for each quarter.
     """
+    conn = sqlite3.connect(finance_db)
+    cursor = conn.cursor()
     
     # Fetch all quarters for the given ticker
     cursor.execute('''
