@@ -10,7 +10,7 @@ import yfinance as yf
 import streamlit as st
 import pandas as pd
 
-finance_db = "../util/database/finance.db"
+finance_db = "util/database/finance.db"
 
 included_metrics = ["total revenue", #dollars
                    "basic eps", #dollars
