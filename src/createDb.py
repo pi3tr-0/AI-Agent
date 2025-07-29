@@ -10,7 +10,8 @@ import yfinance as yf
 import streamlit as st
 import pandas as pd
 
-finance_db = "../util/database/finance.db"
+createdb_path = os.path.dirname(os.path.abspath(__file__))
+finance_db = os.path.join(createdb_path, "../util/database/finance.db")
 
 included_metrics = ["total revenue", #dollars
                    "basic eps", #dollars

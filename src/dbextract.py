@@ -8,6 +8,8 @@ import yfinance as yf
 import streamlit as st
 
 finance_db = "../util/database/finance.db"
+conn = sqlite3.connect(finance_db)
+cursor = conn.cursor()
 
 expected_output = {
     "Q1 2024": {
@@ -103,19 +105,19 @@ def extract_ticker_data(ticker):
             data[quarter] = {}
         data[quarter][metric] = value
     
+    conn.commit()
     conn.close()
     
     return data
 
 def main():
     global conn, cursor
-    conn = sqlite3.connect(finance_db)
-    cursor = conn.cursor()
+    # conn = sqlite3.connect(finance_db)
+    # cursor = conn.cursor()
     
     # Example usage
-    st.write(extract_ticker_data("AAPL"))
+    # st.write(extract_ticker_data("AAPL"))
 
-    conn.close()
 
 if __name__ == "__main__":
     main()
