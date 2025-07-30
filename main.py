@@ -2,57 +2,65 @@ import streamlit as st
 from dotenv import load_dotenv
 from src import fileParser, internetSearch, sentimentAnalysis, financialAnalysis
 import os
+from typing import Any, Dict
 
+# -------------------------------
 # Functions
-def ParsePDFAndSearch(pdfBytes, gemini_api_key, tavily_api_key):
-
-    # parse pdf
+# -------------------------------
+def ParsePDFAndSearch(pdfBytes: bytes, gemini_api_key: str, tavily_api_key: str) -> Dict[str, Any]:
+    """Parse PDF and perform internet search."""
     fileParserOutput = dict(fileParser.ParseFile(pdfBytes, gemini_api_key).output)
+    
+    # Required for JSON compatibility
+    fileParserOutput["financialMetrics"] = dict(fileParserOutput.get("financialMetrics", {}))
+    fileParserOutput["analyst"] = dict(fileParserOutput.get("analyst", {}))
 
-    # required for json serialization (need to convert to native type)        
-    fileParserOutput["financialMetrics"] = dict(fileParserOutput["financialMetrics"])
-    fileParserOutput["analyst"] = dict(fileParserOutput["analyst"])
+    ticker = fileParserOutput.get("ticker")
+    period = fileParserOutput.get("period")
 
-    ticker = fileParserOutput["ticker"]
-    period = fileParserOutput["period"]
+    if ticker and period:
+        searchResult = internetSearch.Search(ticker, period, gemini_api_key, tavily_api_key).output
+        fileParserOutput["searchResult"] = searchResult
+    else:
+        fileParserOutput["searchResult"] = {}
 
-    # search
-    searchResult = internetSearch.Search(ticker, period, gemini_api_key, tavily_api_key).output
-    fileParserOutput["searchResult"] = searchResult
-
-    # todo: update financial metrics database
+    # TODO: Update financial metrics database if needed
     # dbextract.UpdateFinancialMetrics(ticker, period, fileParserOutput["financialMetrics"])
 
     return fileParserOutput
 
-# API key
-load_dotenv()
-gemini_api_key = os.getenv("GEMINI_API_KEY")
-tavily_api_key = os.getenv("TAVILY_API_KEY")
+def main():
+    load_dotenv()
+    gemini_api_key = os.getenv("GEMINI_API_KEY")
+    tavily_api_key = os.getenv("TAVILY_API_KEY")
 
-# Streamlit Interface
-prompt = st.chat_input(
-    "Optional: Additional Query",
-    accept_file=True,
-    file_type=["pdf"],
-)
-if prompt:
-    if prompt["files"]:
-        pdfBytes = prompt["files"][0].read()
-        
-        content = ParsePDFAndSearch(pdfBytes, gemini_api_key, tavily_api_key)
-        
-        st.write(content)
+    st.title("Agentic AI Financial Analyzer")
 
-        sentiment = dict(sentimentAnalysis.AnalyzeSentiment(content, gemini_api_key).output)
+    prompt = st.chat_input(
+        "Optional: Additional Query",
+        accept_file=True,
+        file_type=["pdf"],
+    )
 
-        st.write(sentiment)
+    if not gemini_api_key or not tavily_api_key:
+        st.error("API keys not found. Please set GEMINI_API_KEY and TAVILY_API_KEY in your .env file.")
+        return
 
-        financialAnalysis = financialAnalysis.AnalyzeFinancial(content["ticker"], gemini_api_key).output
+    if prompt:
+        if prompt.get("files"):
+            pdfBytes = prompt["files"][0].read()
+            content = ParsePDFAndSearch(pdfBytes, gemini_api_key, tavily_api_key)
+            st.write(content)
 
-        st.write(financialAnalysis)
+            sentiment = dict(sentimentAnalysis.AnalyzeSentiment(content, gemini_api_key).output)
+            st.write(sentiment)
 
-    else:
-        st.write("PDF Required")
-    
+            financial_result = financialAnalysis.AnalyzeFinancial(content.get("ticker", ""), gemini_api_key).output
+            st.write(financial_result)
+        else:
+            st.warning("PDF Required")
+
+if __name__ == "__main__":
+    main()
+
 
