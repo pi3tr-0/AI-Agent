@@ -3,7 +3,7 @@ import numpy as np
 from src import dbextract
 from sklearn.linear_model import LinearRegression
 
-def FindAnomaly(ticker: str):
+def FindAnomaly(ticker: str) -> pd.DataFrame:
     
     data = dbextract.extract_ticker_data(ticker)
 
