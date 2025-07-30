@@ -2,120 +2,106 @@ import pandas as pd
 import numpy as np
 from src import dbextract
 from sklearn.linear_model import LinearRegression
+from pydantic_ai import Tool
 
-def FindAnomaly(ticker: str) -> pd.DataFrame:
-    
+# -------------------------------
+# Main Function
+# -------------------------------
+def FindAnomaly(ticker: str) -> dict:
     data = dbextract.extract_ticker_data(ticker)
-
-    quarterData = dict()
-
+    # Map quarter strings to float values for sorting
+    quarter_map = {'Q1': 0.0, 'Q2': 0.25, 'Q3': 0.5, 'Q4': 0.75}
+    quarter_data = {}
     for key in data:
-        arr = key.split()
-        num = float(arr[1])
-        if arr[0] == 'Q2':
-            num += 0.25
-        elif arr[0] == 'Q3':
-            num += 0.5
-        elif arr[0] == 'Q4':
-            num += 0.75
-        quarterData[num] = data[key]
+        quarter, year = key.split()
+        num = float(year) + quarter_map.get(quarter, 0.0)
+        quarter_data[num] = data[key]
 
+    # Sort by year+quarter
+    sorted_quarters = sorted(quarter_data.items())
+    current_year = float(sorted_quarters[-1][0])
+    current_metrics = sorted_quarters[-1][1]
+    past_years = dict(sorted_quarters[:-1])
 
-    # load and sort the dict (list of tuples)
-    totalDict = sorted(quarterData.items())
-    
-    # current year and past years dict
-    currentYear = float(totalDict[-1][0])
-    currentYearDict = (totalDict[-1][1])
-    pastYearsDict = dict(totalDict[:-1])
-
-    result = dict()
-    
-    # Comparison 1: Simple Average Comparison
-    historicalSimpleAveragesDict = ComputeSimpleAverages(pastYearsDict)
-    result["simpleAverages"] = CompareSimpleAverages(currentYearDict, historicalSimpleAveragesDict)
-    result["linearRegression"] = CompareLinearRegression(currentYear, currentYearDict, pastYearsDict)
+    result = {}
+    # Simple Average Comparison
+    historical_averages = ComputeSimpleAverages(past_years)
+    result["simpleAverages"] = CompareSimpleAverages(current_metrics, historical_averages)
+    # Linear Regression Comparison
+    result["linearRegression"] = CompareLinearRegression(current_year, current_metrics, past_years)
 
     df = pd.DataFrame(result).T
+    return df.to_dict()
 
-    return df
 
+# -------------------------------
+# Helper Functions
+# -------------------------------
 def ComputeLRPredictedValue(currentYear, currentYearValue, metricDict):
-    significantValue = 0.1
-
-    x = np.array(list(metricDict.keys())).reshape(-1, 1)
-    y = np.array(list(metricDict.values()))
-
+    threshold = 0.1
+    years = np.array(list(metricDict.keys())).reshape(-1, 1)
+    values = np.array(list(metricDict.values()))
     model = LinearRegression()
-    model.fit(x, y)
-
-    if model.score(x, y) < 1:
-        return "model not valid"
-    
-    new_x = np.array([[currentYear]])
-    predicted_y = model.predict(new_x)
-
-    difference = (currentYearValue - predicted_y) / abs(predicted_y)
-
-    if (difference > significantValue):
+    model.fit(years, values)
+    # Require at least some fit quality
+    if model.score(years, values) < 0.7:
+        return "Model not valid"
+    predicted = model.predict(np.array([[currentYear]]))[0]
+    diff_ratio = (currentYearValue - predicted) / abs(predicted)
+    if diff_ratio > threshold:
         return "Higher than expected"
-    elif (difference < -significantValue):
+    elif diff_ratio < -threshold:
         return "Lower than expected"
-    else:
-        return "Changes within the tolerable range"
+    return "Changes within the tolerable range"
 
 def CompareLinearRegression(currentYear, currentYearDict, pastYearsDict):
-    metrics = dict()
-    result = dict() # e.g. {'revenueGrowth': positive, 'ebitda': no value}
-    for key in currentYearDict:
-        metrics[key] = dict()
-    
-    for year in pastYearsDict:
-        particularYear = (pastYearsDict[year])
-        for key in particularYear:
-            if key in metrics:
-                metrics[key][float(year)] = particularYear[key]
-
-    for key in metrics:
-        if len(metrics[key]) == 0:
+    metric_history = {key: {} for key in currentYearDict}
+    for year, metrics in pastYearsDict.items():
+        for key, value in metrics.items():
+            if key in metric_history:
+                metric_history[key][float(year)] = value
+    result = {}
+    for key, history in metric_history.items():
+        if not history:
             result[key] = "No Historical Data"
         else:
-            result[key] = ComputeLRPredictedValue(currentYear,currentYearDict[key],metrics[key])
-    
+            result[key] = ComputeLRPredictedValue(currentYear, currentYearDict[key], history)
     return result
 
 # Compute the historical averages for comparison
 def ComputeSimpleAverages(pastYearsDict):
-    averageDict = dict()
-
-    for year in pastYearsDict:
-        for metric in pastYearsDict[year]: 
-            if metric in averageDict:
-                averageDict[metric] += pastYearsDict[year][metric]
-            else:
-                averageDict[metric] = pastYearsDict[year][metric]
-
-    num_year = len(pastYearsDict)
-    for key in averageDict:
-        averageDict[key] = averageDict[key] / num_year
-
-    return averageDict
+    sums = {}
+    counts = {}
+    for metrics in pastYearsDict.values():
+        for metric, value in metrics.items():
+            sums[metric] = sums.get(metric, 0) + value
+            counts[metric] = counts.get(metric, 0) + 1
+    averages = {metric: sums[metric] / counts[metric] for metric in sums}
+    return averages
 
 # Simple Averages Comparison
 def CompareSimpleAverages(currentYear, historicalSimpleAverages):
-    significantValue = 0.1 # % change threshold
-
-    changes = dict() # record changes (if any) in a dict
-
-    for key in currentYear:
-        if key not in historicalSimpleAverages: # edgecase: no historical data
+    threshold = 0.1
+    changes = {}
+    for key, value in currentYear.items():
+        if key not in historicalSimpleAverages:
             changes[key] = "No historical data"
             continue
-        change = (currentYear[key] - historicalSimpleAverages[key])/abs(historicalSimpleAverages[key])
-        if change > significantValue:
+        diff_ratio = (value - historicalSimpleAverages[key]) / abs(historicalSimpleAverages[key])
+        if diff_ratio > threshold:
             changes[key] = "Higher than expected"
-        elif change < -significantValue:
+        elif diff_ratio < -threshold:
             changes[key] = "Lower than expected"
         else:
             changes[key] = "Changes within the tolerable range"
     return changes
+
+
+# -------------------------------
+# Tool Declaration
+# -------------------------------
+AnomalyDetection = Tool(
+        FindAnomaly,
+        name="anomalyDetection",
+        description="Detects financial anomalies using simple average and regression trend analysis.",
+    )
