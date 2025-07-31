@@ -1,6 +1,6 @@
 import streamlit as st
 from dotenv import load_dotenv
-from src import fileParser, internetSearch, sentimentAnalysis, financialAnalysis
+from src import fileParser, internetSearch, sentimentAnalysis, financialAnalysis, reportGeneration
 import os
 import asyncio
 import nest_asyncio
@@ -61,17 +61,19 @@ async def main():
     if prompt:
         if prompt.get("files"):
             pdfBytes = prompt["files"][0].read()
+
             # Parse PDF and perform search
             content = ParsePDFAndSearch(pdfBytes, gemini_api_key, tavily_api_key)
-            st.write(content)
 
             # Run sentiment and financial analysis concurrently
             sentiment, financial = await asyncio.gather(
                 sentimentAnalysis.AnalyzeSentiment(content, gemini_api_key),
                 financialAnalysis.AnalyzeFinancial(content.get("ticker", ""), gemini_api_key)
             )
-            st.write(sentiment.output)
-            st.write(financial.output)
+
+            # Generate and display the financial report
+            st.write(reportGeneration.GenerateReport(sentiment, financial, gemini_api_key).output)
+
         else:
             st.warning("PDF Required. Please upload a PDF file.")
 

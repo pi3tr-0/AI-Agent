@@ -38,7 +38,7 @@ async def AnalyzeFinancial(ticker, gemini_api_key):
     # Run the agent synchronously for the given ticker
     result = agent.run_sync(ticker)
 
-    return result
+    return result.output        
 
 
 

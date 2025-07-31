@@ -58,4 +58,13 @@ async def AnalyzeSentiment(content, gemini_api_key):
     # --- Run Sentiment Analysis ---
     result = agent.run_sync([json.dumps(content)])
 
-    return result
+    # --- Process Result ---
+    sentiment  = dict(result.output)
+    sentiment["analyst_sentiment"] = dict(sentiment.get("analyst_sentiment", ""))
+    sentiment["market_sentiment"] = dict(sentiment.get("market_sentiment", ""))
+    new_detected_trends = []
+    for trend in sentiment.get("detected_trends", []):
+        new_detected_trends.append(dict(trend))
+    sentiment["detected_trends"] = new_detected_trends
+
+    return json.dumps(sentiment)
