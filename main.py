@@ -25,7 +25,6 @@ def ParsePDFAndSearch(pdfBytes: bytes, gemini_api_key: str, tavily_api_key: str)
         fileParserOutput["searchResult"] = {}
 
     # TODO: Update financial metrics database if needed
-    # dbextract.UpdateFinancialMetrics(ticker, period, fileParserOutput["financialMetrics"])
 
     return fileParserOutput
 
@@ -62,5 +61,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
