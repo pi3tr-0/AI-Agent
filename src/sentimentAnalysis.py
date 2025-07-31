@@ -6,7 +6,7 @@ from typing import List, Literal
 import json
 
 
-def AnalyzeSentiment(content, gemini_api_key):
+async def AnalyzeSentiment(content, gemini_api_key):
     class SentimentTrend(BaseModel):
         theme: str = Field(..., description="The topic or theme under discussion")
         sentiment_trend: Literal["Increasing", "Decreasing", "Stable"] = Field(..., description="Direction of sentiment movement over time")

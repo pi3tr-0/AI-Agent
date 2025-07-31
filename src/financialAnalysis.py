@@ -3,7 +3,7 @@ from pydantic_ai.models.gemini import GeminiModel
 from pydantic_ai.providers.google_gla import GoogleGLAProvider
 from tools.anomalyDetection import AnomalyDetection
 
-def AnalyzeFinancial(ticker, gemini_api_key):
+async def AnalyzeFinancial(ticker, gemini_api_key):
     model = GeminiModel('gemini-2.5-flash', provider=GoogleGLAProvider(api_key=gemini_api_key))
 
     tools = [AnomalyDetection]
