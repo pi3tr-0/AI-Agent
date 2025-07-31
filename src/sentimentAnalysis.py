@@ -7,6 +7,11 @@ import json
 
 
 async def AnalyzeSentiment(content, gemini_api_key):
+    """
+    Analyze market and analyst sentiment for a company using AI.
+    Returns a structured sentiment analysis output.
+    """
+    # --- Data Models for Output Structure ---
     class SentimentTrend(BaseModel):
         theme: str = Field(..., description="The topic or theme under discussion")
         sentiment_trend: Literal["Increasing", "Decreasing", "Stable"] = Field(..., description="Direction of sentiment movement over time")
@@ -23,10 +28,11 @@ async def AnalyzeSentiment(content, gemini_api_key):
         overall_sentiment: Literal["Positive", "Neutral", "Negative"] = Field(..., description="Overall sentiment across all sources")
         confidence_score: float = Field(..., ge=0.0, le=1.0, description="Overall confidence score for the sentiment result (0.0 to 1.0)")
         analyst_sentiment: SentimentClassification = Field(..., description="Analyst sentiment/outlook for the company")
-        market_sentiment: SentimentClassification = Field(..., description="Analyst sentiment/outlook for the company")
+        market_sentiment: SentimentClassification = Field(..., description="Market sentiment/outlook for the company")
         key_themes: List[str] = Field(..., description="High-level topics or concerns that influenced sentiment")
         detected_trends: List[SentimentTrend] = Field(..., description="Sentiment direction trends around specific themes")
 
+    # --- System Prompt for the Agent ---
     system_prompt = """
     You are a financial analysis assistant specialized in parsing and interpreting market and analyst sentiment about public companies from structured or unstructured data such as earnings call transcripts, analyst reports, news articles, and financial summaries.
 
@@ -45,10 +51,11 @@ async def AnalyzeSentiment(content, gemini_api_key):
     You are accurate, concise, and avoid speculation. If the data is insufficient to determine sentiment, state that clearly.
     """
 
+    # --- Initialize Gemini Model and Agent ---
     model = GeminiModel('gemini-2.5-flash', provider=GoogleGLAProvider(api_key=gemini_api_key))
-        
     agent = Agent(model=model, system_prompt=system_prompt, output_type=SentimentAnalysisOutput)
 
+    # --- Run Sentiment Analysis ---
     result = agent.run_sync([json.dumps(content)])
 
     return result

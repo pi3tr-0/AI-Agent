@@ -1,10 +1,15 @@
-from pydantic_ai import Agent, BinaryContent
+from pydantic_ai import Agent
 from pydantic_ai.models.gemini import GeminiModel
 from pydantic_ai.providers.google_gla import GoogleGLAProvider
 from pydantic_ai.common_tools.duckduckgo import duckduckgo_search_tool
 from pydantic_ai.common_tools.tavily import tavily_search_tool
 
 def Search(ticker, period, gemini_api_key, tavily_api_key):
+    """
+    Search the internet for recent financial news, sentiment, and analyst commentary about a company.
+    Returns a structured summary of findings using multiple search tools.
+    """
+    # --- System prompt for the agent ---
     system_prompt = """
         You are a financial intelligence agent designed to search the internet for recent developments about a specified company. Your objective is to provide up-to-date, concise, and actionable insights for financial analysts or business users.
 
@@ -51,16 +56,17 @@ def Search(ticker, period, gemini_api_key, tavily_api_key):
         Only return results relevant to the company. Do not speculate or fabricate information.
         """
 
-
+    # --- Initialize Gemini model and agent with search tools ---
     model = GeminiModel('gemini-2.0-flash', provider=GoogleGLAProvider(api_key=gemini_api_key))
-    agent = Agent(model=model, tools=[tavily_search_tool(tavily_api_key), duckduckgo_search_tool()], system_prompt=system_prompt)
-
-    prompt = ticker + " " + period
-
-    result = agent.run_sync(
-    [
-        prompt
-    ]
+    agent = Agent(
+        model=model,
+        tools=[tavily_search_tool(tavily_api_key), duckduckgo_search_tool()],
+        system_prompt=system_prompt
     )
 
+    # --- Build search prompt ---
+    prompt = ticker + " " + period
+
+    # --- Run the agent to perform search and summarization ---
+    result = agent.run_sync([prompt])
     return result

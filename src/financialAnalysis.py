@@ -4,10 +4,17 @@ from pydantic_ai.providers.google_gla import GoogleGLAProvider
 from tools.anomalyDetection import AnomalyDetection
 
 async def AnalyzeFinancial(ticker, gemini_api_key):
+    """
+    Analyze the financial health of a company using financial tools.
+    Returns a structured analysis for the given ticker.
+    """
+    # Initialize Gemini model with Google GLA provider
     model = GeminiModel('gemini-2.5-flash', provider=GoogleGLAProvider(api_key=gemini_api_key))
 
+    # List of available tools for the agent
     tools = [AnomalyDetection]
 
+    # System prompt for the agent, describing its role and tool usage
     system_prompt = """
     You are a financial analysis assistant with access to specialized tools for evaluating company performance. Your goal is to help users understand financial health, detect risks, compare historical trends, and summarize key insights using accurate, data-backed analysis.
 
@@ -25,10 +32,12 @@ async def AnalyzeFinancial(ticker, gemini_api_key):
     Respond clearly, using structured formats (e.g., bullet points or sections) when helpful. Keep your output accurate, concise, and investor-ready.
     """
 
+    # Create the agent with the model, prompt, and tools
     agent = Agent(model=model, system_prompt=system_prompt, tools=tools)
-    
+
+    # Run the agent synchronously for the given ticker
     result = agent.run_sync(ticker)
-    
+
     return result
 
 
