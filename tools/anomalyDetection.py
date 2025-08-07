@@ -7,8 +7,15 @@ from pydantic_ai import Tool
 # -------------------------------
 # Main Function
 # -------------------------------
-def FindAnomaly(ticker: str) -> dict:
-    data = dbextract.extract_ticker_data(ticker)
+def FindAnomaly(ticker: str, period: str) -> dict:
+    data = dbextract.extract_ticker_data(ticker, period)
+    
+    # Handle case where no data is available
+    if not data:
+        return {
+            "error": f"No financial data available for ticker {ticker} and period {period}. Please ensure the period is in the format 'Q<1-4> YYYY' (e.g., 'Q3 2024')."
+        }
+    
     # Map quarter strings to float values for sorting
     quarter_map = {'Q1': 0.0, 'Q2': 0.25, 'Q3': 0.5, 'Q4': 0.75}
     quarter_data = {}
@@ -16,6 +23,12 @@ def FindAnomaly(ticker: str) -> dict:
         quarter, year = key.split()
         num = float(year) + quarter_map.get(quarter, 0.0)
         quarter_data[num] = data[key]
+
+    # Check if we have enough data for analysis
+    if len(quarter_data) < 2:
+        return {
+            "error": f"Insufficient historical data for {ticker}. Need at least 2 quarters of data for anomaly detection."
+        }
 
     # Sort by year+quarter
     sorted_quarters = sorted(quarter_data.items())
@@ -118,5 +131,5 @@ def CompareSimpleAverages(currentQuarter, historicalSimpleAverages):
 AnomalyDetection = Tool(
         FindAnomaly,
         name="anomalyDetection",
-        description="Detects financial anomalies using simple average and regression trend analysis.",
+        description="Detects financial anomalies using simple average and regression trend analysis. REQUIRES both ticker (e.g., 'AAPL') and period (e.g., 'Q3 2024') parameters.",
     )

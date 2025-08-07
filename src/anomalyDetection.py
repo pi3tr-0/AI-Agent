@@ -7,8 +7,8 @@ from pydantic_ai import Tool
 # -------------------------------
 # Main Function
 # -------------------------------
-def FindAnomaly(ticker: str) -> dict:
-    data = dbextract.extract_ticker_data(ticker)
+def FindAnomaly(ticker: str, period: str) -> dict:
+    data = dbextract.extract_ticker_data(ticker, period)
     # Map quarter strings to float values for sorting
     quarter_map = {'Q1': 0.0, 'Q2': 0.25, 'Q3': 0.5, 'Q4': 0.75}
     quarter_data = {}

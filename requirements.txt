@@ -10,3 +10,4 @@ html5lib
 scikit-learn
 pydantic-ai-slim[duckduckgo]
 pydantic-ai-slim[tavily]
+nest_asyncio

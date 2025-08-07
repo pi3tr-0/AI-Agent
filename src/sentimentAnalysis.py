@@ -56,6 +56,34 @@ async def AnalyzeSentiment(content, gemini_api_key):
     agent = Agent(model=model, system_prompt=system_prompt, output_type=SentimentAnalysisOutput)
 
     # --- Run Sentiment Analysis ---
-    result = agent.run_sync([json.dumps(content)])
-
-    return result
+    try:
+        result = agent.run_sync([json.dumps(content)])
+        return result
+    except Exception as e:
+        # Create a simple error response that matches the expected structure
+        error_response = {
+            "company_name": "Unknown",
+            "overall_sentiment": "Error",
+            "confidence_score": 0.0,
+            "analyst_sentiment": {
+                "sentiment": "Error",
+                "confidence": 0.0,
+                "supporting_quotes": [],
+                "source": "Error"
+            },
+            "market_sentiment": {
+                "sentiment": "Error", 
+                "confidence": 0.0,
+                "supporting_quotes": [],
+                "source": "Error"
+            },
+            "key_themes": [],
+            "detected_trends": []
+        }
+        
+        # Create a simple object that mimics the pydantic output
+        class SimpleErrorResult:
+            def __init__(self, data):
+                self.output = data
+        
+        return SimpleErrorResult(error_response)

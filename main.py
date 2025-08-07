@@ -1,6 +1,6 @@
 import streamlit as st
 from dotenv import load_dotenv
-from src import fileParser, internetSearch, sentimentAnalysis, financialAnalysis
+from src import fileParser, internetSearch, sentimentAnalysis, financialAnalysis, leadershipSearch, leadershipAnalysis
 import os
 import asyncio
 import nest_asyncio
@@ -63,15 +63,53 @@ async def main():
             pdfBytes = prompt["files"][0].read()
             # Parse PDF and perform search
             content = ParsePDFAndSearch(pdfBytes, gemini_api_key, tavily_api_key)
+            st.write("## Parsed PDF")
             st.write(content)
 
-            # Run sentiment and financial analysis concurrently
-            sentiment, financial = await asyncio.gather(
-                sentimentAnalysis.AnalyzeSentiment(content, gemini_api_key),
-                financialAnalysis.AnalyzeFinancial(content.get("ticker", ""), gemini_api_key)
-            )
-            st.write(sentiment.output)
-            st.write(financial.output)
+            ticker = content.get("ticker", "")
+            period = content.get("period", "")
+
+            # Run sentiment, financial, and leadership analysis concurrently with error handling
+            try:
+                sentiment, financial, leadership_search = await asyncio.gather(
+                    sentimentAnalysis.AnalyzeSentiment(content, gemini_api_key),
+                    financialAnalysis.AnalyzeFinancial(ticker, period, gemini_api_key),
+                    leadershipSearch.LeadershipSearch(ticker, period, gemini_api_key),  # Fixed: Added await
+                    return_exceptions=True
+                )
+                
+                # Handle sentiment analysis results
+                if isinstance(sentiment, Exception):
+                    st.error(f"Sentiment Analysis Error: {str(sentiment)}")
+                else:
+                    st.write("## Sentiment Analysis")
+                    st.write(sentiment.output)
+                
+                # Handle financial analysis results
+                if isinstance(financial, Exception):
+                    st.error(f"Financial Analysis Error: {str(financial)}")
+                else:
+                    st.write("## Financial Analysis")
+                    st.write(financial.output)
+                
+                # Handle leadership search results
+                if isinstance(leadership_search, Exception):
+                    st.error(f"Leadership Search Error: {str(leadership_search)}")
+                else:
+                    # st.write("## Leadership Search")
+                    # st.write(leadership_search)
+                    
+                    # Run leadership analysis with correct parameters
+                    try:
+                        # Fixed: Pass ticker and period, not search results
+                        leadership_analysis = await leadershipAnalysis.AnalyzeLeadership(ticker, period, gemini_api_key)
+                        st.write("## Leadership Analysis")
+                        st.write(leadership_analysis.output)
+                    except Exception as e:
+                        st.error(f"Leadership Analysis Error: {str(e)}")
+                    
+            except Exception as e:
+                st.error(f"Analysis Error: {str(e)}")
         else:
             st.warning("PDF Required. Please upload a PDF file.")
 
@@ -82,4 +120,3 @@ if __name__ == "__main__":
     nest_asyncio.apply()  # Allow nested event loops for Streamlit
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main())
-

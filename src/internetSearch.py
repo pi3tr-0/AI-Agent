@@ -42,14 +42,10 @@ def Search(ticker, period, gemini_api_key, tavily_api_key):
         - Product Launch: Positive
         - Legal Issues: Negative
 
-        3. Leadership Updates
-        - <e.g., John Smith appointed CFO - Reuters, July 18>
-        - If no changes: "No leadership updates found."
-
-        4. Analyst & Market Reactions
+        3. Analyst & Market Reactions
         - <e.g., JP Morgan downgrades to Neutral - CNBC, July 10>
 
-        5. Key Themes or Concerns
+        4. Key Themes or Concerns
         - <e.g., Increased focus on AI strategy>
         - <e.g., Antitrust investigations in EU>
 
@@ -68,5 +64,11 @@ def Search(ticker, period, gemini_api_key, tavily_api_key):
     prompt = ticker + " " + period
 
     # --- Run the agent to perform search and summarization ---
-    result = agent.run_sync([prompt])
-    return result
+    try:
+        result = agent.run_sync([prompt])
+        return result
+    except Exception as e:
+        # Return a structured error response
+        return {
+            "output": f"Search failed due to error: {str(e)[:200]}"
+        }

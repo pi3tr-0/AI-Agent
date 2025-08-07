@@ -79,38 +79,75 @@ expected_output = {
     }
 }
 
-def extract_ticker_data(ticker):
+
+import sqlite3
+
+def extract_ticker_data(ticker, period):
     """
-    Extracts financial data for a given ticker from the SQLite database.
-    
+    Extracts financial data for a given ticker strictly before the given period.
+
     Args:
-        ticker (str): The stock ticker symbol.
-    
+        ticker (str): Company ticker symbol (e.g. "AAPL").
+        period (str): Cutoff period, formatted "Q<1–4> YYYY" (e.g. "Q3 2023").
+
     Returns:
-        dict: A dictionary containing financial data for each quarter.
+        dict[str, dict[str, float]]: 
+            A mapping from quarter string to a dict of { metric_name: value }.
+            Only includes quarters < the cutoff period.
     """
+    # Handle invalid or missing period
+    if not period or not isinstance(period, str):
+        return {}
+    
+    # Parse cutoff quarter & year
+    try:
+        parts = period.split()
+        if len(parts) != 2:
+            return {}
+        
+        cutoff_q_str, cutoff_year_str = parts
+        
+        # Validate quarter format
+        if not cutoff_q_str.startswith('Q') or len(cutoff_q_str) != 2:
+            return {}
+        
+        cutoff_year = int(cutoff_year_str)
+        cutoff_q = int(cutoff_q_str.lstrip("Q"))
+        
+        # Validate quarter number
+        if cutoff_q < 1 or cutoff_q > 4:
+            return {}
+            
+    except (ValueError, AttributeError):
+        return {}
+
+    # Open and query
     conn = sqlite3.connect(finance_db)
     cursor = conn.cursor()
-    
-    # Fetch all quarters for the given ticker
-    cursor.execute('''
-        SELECT quarter, metric, value FROM financials WHERE ticker = ?
-    ''', (ticker,))
-    
+    cursor.execute(
+        "SELECT quarter, metric, value FROM financials WHERE ticker = ?",
+        (ticker.upper(),)
+    )
     rows = cursor.fetchall()
-    
-    # Process the fetched data into a structured dictionary
-    data = {}
-    for row in rows:
-        quarter, metric, value = row
-        if quarter not in data:
-            data[quarter] = {}
-        data[quarter][metric] = value
-    
-    #conn.close()
-    
-    return data
+    conn.close()
 
+    # Filter & structure
+    data: dict[str, dict[str, float]] = {}
+    for quarter_str, metric, value in rows:
+        # parse each row’s quarter/year
+        try:
+            [q_str, year_str] = quarter_str.split()
+            year = int(year_str)
+            q = int(q_str.lstrip("Q"))
+        except ValueError:
+            # skip any malformed entries
+            continue
+
+        # include only if (year < cutoff_year) or (same year but q < cutoff_q)
+        if (year < cutoff_year) or (year == cutoff_year and q < cutoff_q):
+            data.setdefault(quarter_str, {})[metric] = value
+
+    return data
 def main():
     global conn, cursor
     # conn = sqlite3.connect(finance_db)
