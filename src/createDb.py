@@ -60,6 +60,68 @@ def create_table_quarter():
     conn.commit()
 
 
+def create_table_financial_analysis():
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS financial_analysis (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticker TEXT NOT NULL,
+            quarter TEXT NOT NULL,
+            analyst_name TEXT NOT NULL,
+            price_target REAL,
+            analyst_summary TEXT,
+            performance_summary TEXT,
+            investment_outlook TEXT,
+            expected_values_future_quarters TEXT,
+            risk_assessment TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (ticker) REFERENCES financials(ticker),
+            FOREIGN KEY (quarter) REFERENCES quarter(quarter),
+            UNIQUE(ticker, quarter, analyst_name)
+        )
+    ''')
+    conn.commit()
+
+
+def create_table_sentiment_analysis():
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS sentiment_analysis (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticker TEXT NOT NULL,
+            quarter TEXT NOT NULL,
+            analyst_name TEXT NOT NULL,
+            analyst_sentiment TEXT,
+            market_sentiment TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (ticker) REFERENCES financials(ticker),
+            FOREIGN KEY (quarter) REFERENCES quarter(quarter),
+            UNIQUE(ticker, quarter, analyst_name)
+        )
+    ''')
+    conn.commit()
+
+
+def create_table_leadership_analysis():
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS leadership_analysis (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticker TEXT NOT NULL,
+            quarter TEXT NOT NULL,
+            analyst_name TEXT NOT NULL,
+            stability_assessment TEXT,
+            investor_implications TEXT,
+            overall_impact TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (ticker) REFERENCES financials(ticker),
+            FOREIGN KEY (quarter) REFERENCES quarter(quarter),
+            UNIQUE(ticker, quarter, analyst_name)
+        )
+    ''')
+    conn.commit()
+
+
 def insert_data(ticker, quarter, metric, value):
     cursor.execute('''
         INSERT INTO financials (ticker, quarter, metric, value)
@@ -195,6 +257,9 @@ def main():
     cursor = conn.cursor()
     create_table_quarter()
     create_table_financials()
+    create_table_financial_analysis()
+    create_table_sentiment_analysis()
+    create_table_leadership_analysis()
     
     for ticker in tickers:
         print(f"Processing {ticker}...")
