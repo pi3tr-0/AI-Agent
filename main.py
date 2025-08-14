@@ -1,7 +1,10 @@
 import streamlit as st
 from dotenv import load_dotenv
-from src import fileParser, internetSearch, sentimentAnalysis, financialAnalysis, leadershipSearch, leadershipAnalysis
-from src.updateDb import update_financial_analysis, update_sentiment_analysis, update_leadership_analysis
+from src.data import fileParser
+from src.search import internetSearch, leadershipSearch
+from src.analysis import sentimentAnalysis, financialAnalysis, leadershipAnalysis
+from src.data.updateDb import update_financial_analysis, update_sentiment_analysis, update_leadership_analysis
+from src.utils.combineAnalysis import combine_analysis_results, get_combined_results_json
 import os
 import asyncio
 import nest_asyncio
@@ -10,7 +13,7 @@ from typing import Any, Dict
 # -------------------------------
 # Functions
 # -------------------------------
-def ParsePDFAndSearch(pdfBytes: bytes, gemini_api_key: str, tavily_api_key: str) -> Dict[str, Any]:
+def ParsePDFAndSearch(pdfBytes: bytes, gemini_api_key: str, tavily_api_key: str, analyst_name: str = None) -> Dict[str, Any]:
     """
     Parse a PDF file, extract financial data, and perform an internet search for the ticker and period.
     Returns a dictionary with parsed and searched data.
@@ -21,6 +24,25 @@ def ParsePDFAndSearch(pdfBytes: bytes, gemini_api_key: str, tavily_api_key: str)
     # Ensure nested dicts for JSON compatibility
     fileParserOutput["financialMetrics"] = dict(fileParserOutput.get("financialMetrics", {}))
     fileParserOutput["analyst"] = dict(fileParserOutput.get("analyst", {}))
+
+    # Add analyst name after ticker key in financialMetrics if provided
+    if analyst_name:
+        # Create a new ordered dictionary to maintain key order
+        ordered_financial_metrics = {}
+        
+        # Add existing keys in desired order
+        if "ticker" in fileParserOutput["financialMetrics"]:
+            ordered_financial_metrics["ticker"] = fileParserOutput["financialMetrics"]["ticker"]
+        
+        # Add analyst_name after ticker
+        ordered_financial_metrics["analyst_name"] = analyst_name
+        
+        # Add all other existing keys
+        for key, value in fileParserOutput["financialMetrics"].items():
+            if key not in ordered_financial_metrics:
+                ordered_financial_metrics[key] = value
+        
+        fileParserOutput["financialMetrics"] = ordered_financial_metrics
 
     ticker = fileParserOutput.get("ticker")
     period = fileParserOutput.get("period")
@@ -77,7 +99,7 @@ async def main():
                 st.warning(f"Could not extract analyst name from filename: {e}")
             
             # Parse PDF and perform search
-            content = ParsePDFAndSearch(pdfBytes, gemini_api_key, tavily_api_key)
+            content = ParsePDFAndSearch(pdfBytes, gemini_api_key, tavily_api_key, analyst_name)
             
             # Display basic information in a structured format
             ticker = content.get("ticker", "")
@@ -184,6 +206,52 @@ async def main():
                             
                     except Exception as e:
                         st.error(f"Leadership Analysis Error: {str(e)}")
+                    
+                # Combine all analysis results into a single JSON structure
+                try:
+                    combined_results = combine_analysis_results(
+                        parsed_content=content,
+                        financial_analysis=financial if not isinstance(financial, Exception) else None,
+                        sentiment_analysis=sentiment if not isinstance(sentiment, Exception) else None,
+                        leadership_analysis=leadership_analysis if not isinstance(leadership_analysis, Exception) else None,
+                        analyst_name=analyst_name,
+                        filename=filename
+                    )
+                    
+                    # Display combined results summary
+                    st.write("## Combined Analysis Summary")
+                    summary = combined_results.get("summary", {})
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric("Analysis Status", summary.get("analysis_status", "Unknown"))
+                    with col2:
+                        st.metric("Total Sections", summary.get("total_sections", 0))
+                    with col3:
+                        st.metric("Analysis Version", combined_results.get("metadata", {}).get("analysis_version", "1.0"))
+                    with col4:
+                        st.metric("Timestamp", combined_results.get("metadata", {}).get("analysis_timestamp", "Unknown")[:19])
+                    
+                    # Create download button for combined JSON
+                    json_data = get_combined_results_json(combined_results)
+                    
+                    # Create filename with analyst name included
+                    ticker = summary.get('ticker', 'UNKNOWN')
+                    period = summary.get('period', 'UNKNOWN').replace(' ', '_')
+                    analyst_safe = analyst_name.replace(' ', '_').replace('-', '_').replace('.', '_')
+                    
+                    file_name = f"{ticker}_{period}_{analyst_safe}_combined_analysis.json"
+                    
+                    st.download_button(
+                        label="📥 Download Combined Analysis (JSON)",
+                        data=json_data,
+                        file_name=file_name,
+                        mime="application/json",
+                        help="Download all analysis results as a single JSON file"
+                    )
+
+                        
+                except Exception as combine_error:
+                    st.error(f"Error combining analysis results: {str(combine_error)}")
                     
             except Exception as e:
                 st.error(f"Analysis Error: {str(e)}")

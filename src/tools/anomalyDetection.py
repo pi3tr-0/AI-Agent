@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from src import dbextract
+from src.data import dbextract
 from sklearn.linear_model import LinearRegression
 from pydantic_ai import Tool
 

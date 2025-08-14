@@ -8,8 +8,9 @@ import yfinance as yf
 import streamlit as st
 
 
-createdb_path = os.path.dirname(os.path.abspath(__file__))
-finance_db = os.path.join(createdb_path, "../util/database/finance.db")
+# Get the project root directory (3 levels up from src/data/)
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+finance_db = os.path.join(project_root, "util", "database", "finance.db")
 
 expected_output = {
     "Q1 2024": {
@@ -122,14 +123,21 @@ def extract_ticker_data(ticker, period):
         return {}
 
     # Open and query
-    conn = sqlite3.connect(finance_db)
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT quarter, metric, value FROM financials WHERE ticker = ?",
-        (ticker.upper(),)
-    )
-    rows = cursor.fetchall()
-    conn.close()
+    try:
+        # Check if database file exists
+        if not os.path.exists(finance_db):
+            return {}
+            
+        conn = sqlite3.connect(finance_db)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT quarter, metric, value FROM financials WHERE ticker = ?",
+            (ticker.upper(),)
+        )
+        rows = cursor.fetchall()
+        conn.close()
+    except (sqlite3.Error, Exception):
+        return {}
 
     # Filter & structure
     data: dict[str, dict[str, float]] = {}

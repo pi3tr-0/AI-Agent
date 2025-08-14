@@ -3,8 +3,8 @@ from pydantic_ai.providers.google_gla import GoogleGLAProvider
 from pydantic_ai import Agent
 from pydantic import BaseModel, Field
 from typing import List, Literal, Optional
-from tools.anomalyDetection import AnomalyDetection
-import json
+from src.tools.anomalyDetection import AnomalyDetection
+
 
 
 async def AnalyzeFinancial(ticker, period, gemini_api_key):
