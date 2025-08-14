@@ -68,11 +68,11 @@ async def main():
 
     st.title("Agentic AI Financial Analyzer")
 
-    # Chat input with PDF upload
-    prompt = st.chat_input(
-        "Optional: Additional Query",
-        accept_file=True,
-        file_type=["pdf"],
+    # PDF upload interface
+    uploaded_file = st.file_uploader(
+        "Upload a PDF file for analysis",
+        type=["pdf"],
+        help="Upload a financial analysis PDF to extract and analyze data"
     )
 
     # Check for required API keys
@@ -80,183 +80,178 @@ async def main():
         st.error("API keys not found. Please set GEMINI_API_KEY and TAVILY_API_KEY in your .env file.")
         return
 
-    # Handle user input and PDF upload
-    if prompt:
-        if prompt.get("files"):
-            pdfBytes = prompt["files"][0].read()
-            filename = prompt["files"][0].name
-            
-            # Extract analyst name from filename: <analyst name> - <ticker> <quarter> <year>
-            analyst_name = "Analyst A"  # Default fallback
-            try:
-                # Split by " - " to get analyst name and rest
-                if " - " in filename:
-                    analyst_name = filename.split(" - ")[0].strip()
-                    # Remove file extension if present
-                    if "." in analyst_name:
-                        analyst_name = analyst_name.rsplit(".", 1)[0]
-            except Exception as e:
-                st.warning(f"Could not extract analyst name from filename: {e}")
-            
-            # Parse PDF and perform search
-            content = ParsePDFAndSearch(pdfBytes, gemini_api_key, tavily_api_key, analyst_name)
-            
-            # Display basic information in a structured format
-            ticker = content.get("ticker", "")
-            period = content.get("period", "")
-            # Use analyst name from filename instead of fileParser
-            
-            # Create a structured display for basic info
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("Ticker", ticker)
-            with col2:
-                st.metric("Period", period)
-            with col3:
-                st.metric("Analyst", analyst_name)
-            
-            # Display the full parsed content
-            st.write("## Full Parsed Content")
-            st.write(content)
+    # Handle PDF upload
+    if uploaded_file is not None:
+        pdfBytes = uploaded_file.read()
+        filename = uploaded_file.name
+        
+        # Extract analyst name from filename: <analyst name> - <ticker> <quarter> <year>
+        analyst_name = "Analyst A"  # Default fallback
+        try:
+            # Split by " - " to get analyst name and rest
+            if " - " in filename:
+                analyst_name = filename.split(" - ")[0].strip()
+                # Remove file extension if present
+                if "." in analyst_name:
+                    analyst_name = analyst_name.rsplit(".", 1)[0]
+        except Exception as e:
+            st.warning(f"Could not extract analyst name from filename: {e}")
+        
+        # Parse PDF and perform search
+        content = ParsePDFAndSearch(pdfBytes, gemini_api_key, tavily_api_key, analyst_name)
+        
+        # Display basic information in a structured format
+        ticker = content.get("ticker", "")
+        period = content.get("period", "")
+        # Use analyst name from filename instead of fileParser
+        
+        # Create a structured display for basic info
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Ticker", ticker)
+        with col2:
+            st.metric("Period", period)
+        with col3:
+            st.metric("Analyst", analyst_name)
+        
+        # Display the full parsed content
+        st.write("## Full Parsed Content")
+        st.write(content)
 
-            # Run sentiment, financial, and leadership analysis concurrently with error handling
+        # Run sentiment, financial, and leadership analysis concurrently with error handling
+        try:
+            sentiment, financial, leadership_search = await asyncio.gather(
+                sentimentAnalysis.AnalyzeSentiment(content, gemini_api_key),
+                financialAnalysis.AnalyzeFinancial(ticker, period, gemini_api_key),
+                leadershipSearch.LeadershipSearch(ticker, period, gemini_api_key),  # Fixed: Added await
+                return_exceptions=True
+            )
+            
+            # Handle sentiment analysis results
+            if isinstance(sentiment, Exception):
+                st.error(f"Sentiment Analysis Error: {str(sentiment)}")
+            else:
+                st.write("## Sentiment Analysis")
+                st.write(sentiment.output)
+            
+            # Handle financial analysis results
+            if isinstance(financial, Exception):
+                st.error(f"Financial Analysis Error: {str(financial)}")
+            else:
+                st.write("## Financial Analysis")
+                st.write(financial.output)
+            
+            # Handle leadership search results
+            if isinstance(leadership_search, Exception):
+                st.error(f"Leadership Search Error: {str(leadership_search)}")
+            else:
+                # st.write("## Leadership Search")
+                # st.write(leadership_search)
+                
+                # Run leadership analysis with correct parameters
+                try:
+                    # Fixed: Pass ticker and period, not search results
+                    leadership_analysis = await leadershipAnalysis.AnalyzeLeadership(ticker, period, gemini_api_key)
+                    st.write("## Leadership Analysis")
+                    st.write(leadership_analysis.output)
+                    
+                    # Update database with analysis results
+                    try:
+                        # Update financial analysis
+                        if not isinstance(financial, Exception):
+                            # Extract risk assessment from financial analysis
+                            risk_assessment = "Based on financial analysis"
+                            if hasattr(financial.output, 'risk_assessment'):
+                                if hasattr(financial.output.risk_assessment, 'risk_level'):
+                                    risk_assessment = f"Risk Level: {financial.output.risk_assessment.risk_level}"
+                                elif hasattr(financial.output.risk_assessment, 'key_risks'):
+                                    risk_assessment = f"Key Risks: {', '.join(financial.output.risk_assessment.key_risks[:3])}"
+                            
+                            # Use analyst name extracted from filename
+                            # analyst_name is already extracted above from filename
+                            
+                            financial_data = {
+                                'analyst_name': analyst_name,
+                                'price_target': None,  # Extract from financial.output if available
+                                'analyst_summary': getattr(financial.output, 'performance_summary', 'Analysis completed'),
+                                'performance_summary': getattr(financial.output, 'performance_summary', 'Performance analyzed'),
+                                'investment_outlook': getattr(financial.output, 'investment_outlook', 'Hold'),
+                                'expected_values_future_quarters': 'To be calculated based on analysis',
+                                'risk_assessment': risk_assessment
+                            }
+                            update_financial_analysis(ticker, period, financial_data)
+                        
+                        # Update sentiment analysis
+                        if not isinstance(sentiment, Exception):
+                            sentiment_data = {
+                                'analyst_name': analyst_name,
+                                'analyst_sentiment': getattr(sentiment.output.analyst_sentiment, 'sentiment', 'Neutral') if hasattr(sentiment.output, 'analyst_sentiment') else 'Neutral',
+                                'market_sentiment': getattr(sentiment.output.market_sentiment, 'sentiment', 'Neutral') if hasattr(sentiment.output, 'market_sentiment') else 'Neutral'
+                            }
+                            update_sentiment_analysis(ticker, period, sentiment_data)
+                        
+                        # Update leadership analysis
+                        if not isinstance(leadership_analysis, Exception):
+                            leadership_data = {
+                                'analyst_name': analyst_name,
+                                'stability_assessment': str(getattr(leadership_analysis.output.stability_assessment, 'stability_score', 'Stable')) if hasattr(leadership_analysis.output, 'stability_assessment') else 'Stable',
+                                'investor_implications': getattr(leadership_analysis.output, 'investor_implications', 'Positive implications'),
+                                'overall_impact': getattr(leadership_analysis.output, 'overall_impact', 'Positive')
+                            }
+                            update_leadership_analysis(ticker, period, leadership_data)
+                            
+                    except Exception as db_error:
+                        st.error(f"Database Update Error: {str(db_error)}")
+                        
+                except Exception as e:
+                    st.error(f"Leadership Analysis Error: {str(e)}")
+                
+            # Combine all analysis results into a single JSON structure
             try:
-                sentiment, financial, leadership_search = await asyncio.gather(
-                    sentimentAnalysis.AnalyzeSentiment(content, gemini_api_key),
-                    financialAnalysis.AnalyzeFinancial(ticker, period, gemini_api_key),
-                    leadershipSearch.LeadershipSearch(ticker, period, gemini_api_key),  # Fixed: Added await
-                    return_exceptions=True
+                combined_results = combine_analysis_results(
+                    parsed_content=content,
+                    financial_analysis=financial if not isinstance(financial, Exception) else None,
+                    sentiment_analysis=sentiment if not isinstance(sentiment, Exception) else None,
+                    leadership_analysis=leadership_analysis if not isinstance(leadership_analysis, Exception) else None,
+                    analyst_name=analyst_name,
+                    filename=filename
                 )
                 
-                # Handle sentiment analysis results
-                if isinstance(sentiment, Exception):
-                    st.error(f"Sentiment Analysis Error: {str(sentiment)}")
-                else:
-                    st.write("## Sentiment Analysis")
-                    st.write(sentiment.output)
+                # Display combined results summary
+                summary = combined_results.get("summary", {})
                 
-                # Handle financial analysis results
-                if isinstance(financial, Exception):
-                    st.error(f"Financial Analysis Error: {str(financial)}")
-                else:
-                    st.write("## Financial Analysis")
-                    st.write(financial.output)
+                # Create download button for combined JSON
+                json_data = get_combined_results_json(combined_results)
                 
-                # Handle leadership search results
-                if isinstance(leadership_search, Exception):
-                    st.error(f"Leadership Search Error: {str(leadership_search)}")
-                else:
-                    # st.write("## Leadership Search")
-                    # st.write(leadership_search)
-                    
-                    # Run leadership analysis with correct parameters
-                    try:
-                        # Fixed: Pass ticker and period, not search results
-                        leadership_analysis = await leadershipAnalysis.AnalyzeLeadership(ticker, period, gemini_api_key)
-                        st.write("## Leadership Analysis")
-                        st.write(leadership_analysis.output)
-                        
-                        # Update database with analysis results
-                        try:
-                            # Update financial analysis
-                            if not isinstance(financial, Exception):
-                                # Extract risk assessment from financial analysis
-                                risk_assessment = "Based on financial analysis"
-                                if hasattr(financial.output, 'risk_assessment'):
-                                    if hasattr(financial.output.risk_assessment, 'risk_level'):
-                                        risk_assessment = f"Risk Level: {financial.output.risk_assessment.risk_level}"
-                                    elif hasattr(financial.output.risk_assessment, 'key_risks'):
-                                        risk_assessment = f"Key Risks: {', '.join(financial.output.risk_assessment.key_risks[:3])}"
-                                
-                                # Use analyst name extracted from filename
-                                # analyst_name is already extracted above from filename
-                                
-                                financial_data = {
-                                    'analyst_name': analyst_name,
-                                    'price_target': None,  # Extract from financial.output if available
-                                    'analyst_summary': getattr(financial.output, 'performance_summary', 'Analysis completed'),
-                                    'performance_summary': getattr(financial.output, 'performance_summary', 'Performance analyzed'),
-                                    'investment_outlook': getattr(financial.output, 'investment_outlook', 'Hold'),
-                                    'expected_values_future_quarters': 'To be calculated based on analysis',
-                                    'risk_assessment': risk_assessment
-                                }
-                                update_financial_analysis(ticker, period, financial_data)
-                            
-                            # Update sentiment analysis
-                            if not isinstance(sentiment, Exception):
-                                sentiment_data = {
-                                    'analyst_name': analyst_name,
-                                    'analyst_sentiment': getattr(sentiment.output.analyst_sentiment, 'sentiment', 'Neutral') if hasattr(sentiment.output, 'analyst_sentiment') else 'Neutral',
-                                    'market_sentiment': getattr(sentiment.output.market_sentiment, 'sentiment', 'Neutral') if hasattr(sentiment.output, 'market_sentiment') else 'Neutral'
-                                }
-                                update_sentiment_analysis(ticker, period, sentiment_data)
-                            
-                            # Update leadership analysis
-                            if not isinstance(leadership_analysis, Exception):
-                                leadership_data = {
-                                    'analyst_name': analyst_name,
-                                    'stability_assessment': str(getattr(leadership_analysis.output.stability_assessment, 'stability_score', 'Stable')) if hasattr(leadership_analysis.output, 'stability_assessment') else 'Stable',
-                                    'investor_implications': getattr(leadership_analysis.output, 'investor_implications', 'Positive implications'),
-                                    'overall_impact': getattr(leadership_analysis.output, 'overall_impact', 'Positive')
-                                }
-                                update_leadership_analysis(ticker, period, leadership_data)
-                                
-                        except Exception as db_error:
-                            st.error(f"Database Update Error: {str(db_error)}")
-                            
-                    except Exception as e:
-                        st.error(f"Leadership Analysis Error: {str(e)}")
-                    
-                # Combine all analysis results into a single JSON structure
-                try:
-                    combined_results = combine_analysis_results(
-                        parsed_content=content,
-                        financial_analysis=financial if not isinstance(financial, Exception) else None,
-                        sentiment_analysis=sentiment if not isinstance(sentiment, Exception) else None,
-                        leadership_analysis=leadership_analysis if not isinstance(leadership_analysis, Exception) else None,
-                        analyst_name=analyst_name,
-                        filename=filename
-                    )
-                    
-                    # Display combined results summary
-                    st.write("## Combined Analysis Summary")
-                    summary = combined_results.get("summary", {})
-                    col1, col2, col3, col4 = st.columns(4)
-                    with col1:
-                        st.metric("Analysis Status", summary.get("analysis_status", "Unknown"))
-                    with col2:
-                        st.metric("Total Sections", summary.get("total_sections", 0))
-                    with col3:
-                        st.metric("Analysis Version", combined_results.get("metadata", {}).get("analysis_version", "1.0"))
-                    with col4:
-                        st.metric("Timestamp", combined_results.get("metadata", {}).get("analysis_timestamp", "Unknown")[:19])
-                    
-                    # Create download button for combined JSON
-                    json_data = get_combined_results_json(combined_results)
-                    
-                    # Create filename with analyst name included
-                    ticker = summary.get('ticker', 'UNKNOWN')
-                    period = summary.get('period', 'UNKNOWN').replace(' ', '_')
-                    analyst_safe = analyst_name.replace(' ', '_').replace('-', '_').replace('.', '_')
-                    
-                    file_name = f"{ticker}_{period}_{analyst_safe}_combined_analysis.json"
-                    
-                    st.download_button(
-                        label="📥 Download Combined Analysis (JSON)",
-                        data=json_data,
-                        file_name=file_name,
-                        mime="application/json",
-                        help="Download all analysis results as a single JSON file"
-                    )
-
-                        
-                except Exception as combine_error:
-                    st.error(f"Error combining analysis results: {str(combine_error)}")
-                    
-            except Exception as e:
-                st.error(f"Analysis Error: {str(e)}")
-        else:
-            st.warning("PDF Required. Please upload a PDF file.")
+                # Create filename with analyst name included
+                ticker = summary.get('ticker', 'UNKNOWN')
+                period = summary.get('period', 'UNKNOWN').replace(' ', '_')
+                analyst_safe = analyst_name.replace(' ', '_').replace('-', '_').replace('.', '_')
+                
+                file_name = f"{ticker}_{period}_{analyst_safe}_combined_analysis.json"
+                
+                st.download_button(
+                    label="📥 Download Combined Analysis (JSON)",
+                    data=json_data,
+                    file_name=file_name,
+                    mime="application/json",
+                    help="Download all analysis results as a single JSON file"
+                )
+                
+            except Exception as combine_error:
+                st.error(f"Error combining analysis results: {str(combine_error)}")
+                
+        except Exception as e:
+            st.error(f"Analysis Error: {str(e)}")
+    else:
+        st.info("Please upload a PDF file to begin analysis.")
+        st.markdown("""
+        ### How to use:
+        1. Upload a financial analysis PDF file
+        2. The system will automatically extract financial data and perform analysis
+        3. Results will include sentiment, financial, and leadership analysis
+        4. Download the combined analysis as JSON when complete
+        """)
 
 ## -------------------------------
 # Run the Streamlit app
